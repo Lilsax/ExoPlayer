@@ -17,6 +17,7 @@ package com.google.android.exoplayer2.source;
 
 import static com.google.android.exoplayer2.util.Assertions.checkNotNull;
 import static java.lang.Math.min;
+import static java.lang.annotation.ElementType.TYPE_USE;
 
 import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
@@ -31,6 +32,7 @@ import java.io.IOException;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -44,25 +46,20 @@ import java.util.Map;
  */
 public final class MergingMediaSource extends CompositeMediaSource<Integer> {
 
-  /**
-   * Thrown when a {@link MergingMediaSource} cannot merge its sources.
-   */
+  /** Thrown when a {@link MergingMediaSource} cannot merge its sources. */
   public static final class IllegalMergeException extends IOException {
 
     /** The reason the merge failed. One of {@link #REASON_PERIOD_COUNT_MISMATCH}. */
     @Documented
     @Retention(RetentionPolicy.SOURCE)
+    @Target(TYPE_USE)
     @IntDef({REASON_PERIOD_COUNT_MISMATCH})
     public @interface Reason {}
-    /**
-     * The sources have different period counts.
-     */
+    /** The sources have different period counts. */
     public static final int REASON_PERIOD_COUNT_MISMATCH = 0;
 
-    /**
-     * The reason the merge failed.
-     */
-    @Reason public final int reason;
+    /** The reason the merge failed. */
+    public final @Reason int reason;
 
     /**
      * @param reason The reason the merge failed.
@@ -70,7 +67,6 @@ public final class MergingMediaSource extends CompositeMediaSource<Integer> {
     public IllegalMergeException(@Reason int reason) {
       this.reason = reason;
     }
-
   }
 
   private static final int PERIOD_COUNT_UNSET = -1;
@@ -163,17 +159,6 @@ public final class MergingMediaSource extends CompositeMediaSource<Integer> {
     clippedMediaPeriods = MultimapBuilder.hashKeys().arrayListValues().build();
   }
 
-  /**
-   * @deprecated Use {@link #getMediaItem()} and {@link MediaItem.PlaybackProperties#tag} instead.
-   */
-  @SuppressWarnings("deprecation")
-  @Deprecated
-  @Override
-  @Nullable
-  public Object getTag() {
-    return mediaSources.length > 0 ? mediaSources[0].getTag() : null;
-  }
-
   @Override
   public MediaItem getMediaItem() {
     return mediaSources.length > 0 ? mediaSources[0].getMediaItem() : EMPTY_MEDIA_ITEM;
@@ -251,13 +236,13 @@ public final class MergingMediaSource extends CompositeMediaSource<Integer> {
 
   @Override
   protected void onChildSourceInfoRefreshed(
-      Integer id, MediaSource mediaSource, Timeline timeline) {
+      Integer childSourceId, MediaSource mediaSource, Timeline newTimeline) {
     if (mergeError != null) {
       return;
     }
     if (periodCount == PERIOD_COUNT_UNSET) {
-      periodCount = timeline.getPeriodCount();
-    } else if (timeline.getPeriodCount() != periodCount) {
+      periodCount = newTimeline.getPeriodCount();
+    } else if (newTimeline.getPeriodCount() != periodCount) {
       mergeError = new IllegalMergeException(IllegalMergeException.REASON_PERIOD_COUNT_MISMATCH);
       return;
     }
@@ -265,7 +250,7 @@ public final class MergingMediaSource extends CompositeMediaSource<Integer> {
       periodTimeOffsetsUs = new long[periodCount][timelines.length];
     }
     pendingTimelineSources.remove(mediaSource);
-    timelines[id] = timeline;
+    timelines[childSourceId] = newTimeline;
     if (pendingTimelineSources.isEmpty()) {
       if (adjustPeriodTimeOffsets) {
         computePeriodTimeOffsets();
@@ -282,8 +267,8 @@ public final class MergingMediaSource extends CompositeMediaSource<Integer> {
   @Override
   @Nullable
   protected MediaPeriodId getMediaPeriodIdForChildMediaPeriodId(
-      Integer id, MediaPeriodId mediaPeriodId) {
-    return id == 0 ? mediaPeriodId : null;
+      Integer childSourceId, MediaPeriodId mediaPeriodId) {
+    return childSourceId == 0 ? mediaPeriodId : null;
   }
 
   private void computePeriodTimeOffsets() {

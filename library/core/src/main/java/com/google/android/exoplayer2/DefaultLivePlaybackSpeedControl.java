@@ -23,6 +23,7 @@ import android.os.SystemClock;
 import com.google.android.exoplayer2.MediaItem.LiveConfiguration;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.Util;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 
 /**
  * A {@link LivePlaybackSpeedControl} that adjusts the playback speed using a proportional
@@ -106,9 +107,10 @@ public final class DefaultLivePlaybackSpeedControl implements LivePlaybackSpeedC
       fallbackMaxPlaybackSpeed = DEFAULT_FALLBACK_MAX_PLAYBACK_SPEED;
       minUpdateIntervalMs = DEFAULT_MIN_UPDATE_INTERVAL_MS;
       proportionalControlFactorUs = DEFAULT_PROPORTIONAL_CONTROL_FACTOR / C.MICROS_PER_SECOND;
-      maxLiveOffsetErrorUsForUnitSpeed = C.msToUs(DEFAULT_MAX_LIVE_OFFSET_ERROR_MS_FOR_UNIT_SPEED);
+      maxLiveOffsetErrorUsForUnitSpeed =
+          Util.msToUs(DEFAULT_MAX_LIVE_OFFSET_ERROR_MS_FOR_UNIT_SPEED);
       targetLiveOffsetIncrementOnRebufferUs =
-          C.msToUs(DEFAULT_TARGET_LIVE_OFFSET_INCREMENT_ON_REBUFFER_MS);
+          Util.msToUs(DEFAULT_TARGET_LIVE_OFFSET_INCREMENT_ON_REBUFFER_MS);
       minPossibleLiveOffsetSmoothingFactor = DEFAULT_MIN_POSSIBLE_LIVE_OFFSET_SMOOTHING_FACTOR;
     }
 
@@ -121,6 +123,7 @@ public final class DefaultLivePlaybackSpeedControl implements LivePlaybackSpeedC
      * @param fallbackMinPlaybackSpeed The fallback minimum factor by which playback can be sped up.
      * @return This builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder setFallbackMinPlaybackSpeed(float fallbackMinPlaybackSpeed) {
       Assertions.checkArgument(0 < fallbackMinPlaybackSpeed && fallbackMinPlaybackSpeed <= 1f);
       this.fallbackMinPlaybackSpeed = fallbackMinPlaybackSpeed;
@@ -136,6 +139,7 @@ public final class DefaultLivePlaybackSpeedControl implements LivePlaybackSpeedC
      * @param fallbackMaxPlaybackSpeed The fallback maximum factor by which playback can be sped up.
      * @return This builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder setFallbackMaxPlaybackSpeed(float fallbackMaxPlaybackSpeed) {
       Assertions.checkArgument(fallbackMaxPlaybackSpeed >= 1f);
       this.fallbackMaxPlaybackSpeed = fallbackMaxPlaybackSpeed;
@@ -151,6 +155,7 @@ public final class DefaultLivePlaybackSpeedControl implements LivePlaybackSpeedC
      *     milliseconds.
      * @return This builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder setMinUpdateIntervalMs(long minUpdateIntervalMs) {
       Assertions.checkArgument(minUpdateIntervalMs > 0);
       this.minUpdateIntervalMs = minUpdateIntervalMs;
@@ -169,6 +174,7 @@ public final class DefaultLivePlaybackSpeedControl implements LivePlaybackSpeedC
      *     speed.
      * @return This builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder setProportionalControlFactor(float proportionalControlFactor) {
       Assertions.checkArgument(proportionalControlFactor > 0);
       this.proportionalControlFactorUs = proportionalControlFactor / C.MICROS_PER_SECOND;
@@ -185,9 +191,10 @@ public final class DefaultLivePlaybackSpeedControl implements LivePlaybackSpeedC
      *     used, in milliseconds.
      * @return This builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder setMaxLiveOffsetErrorMsForUnitSpeed(long maxLiveOffsetErrorMsForUnitSpeed) {
       Assertions.checkArgument(maxLiveOffsetErrorMsForUnitSpeed > 0);
-      this.maxLiveOffsetErrorUsForUnitSpeed = C.msToUs(maxLiveOffsetErrorMsForUnitSpeed);
+      this.maxLiveOffsetErrorUsForUnitSpeed = Util.msToUs(maxLiveOffsetErrorMsForUnitSpeed);
       return this;
     }
 
@@ -199,10 +206,12 @@ public final class DefaultLivePlaybackSpeedControl implements LivePlaybackSpeedC
      *     when the player is rebuffering, in milliseconds
      * @return This builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder setTargetLiveOffsetIncrementOnRebufferMs(
         long targetLiveOffsetIncrementOnRebufferMs) {
       Assertions.checkArgument(targetLiveOffsetIncrementOnRebufferMs >= 0);
-      this.targetLiveOffsetIncrementOnRebufferUs = C.msToUs(targetLiveOffsetIncrementOnRebufferMs);
+      this.targetLiveOffsetIncrementOnRebufferUs =
+          Util.msToUs(targetLiveOffsetIncrementOnRebufferMs);
       return this;
     }
 
@@ -220,6 +229,7 @@ public final class DefaultLivePlaybackSpeedControl implements LivePlaybackSpeedC
      * @param minPossibleLiveOffsetSmoothingFactor The smoothing factor. Must be &ge; 0 and &lt; 1.
      * @return This builder, for convenience.
      */
+    @CanIgnoreReturnValue
     public Builder setMinPossibleLiveOffsetSmoothingFactor(
         float minPossibleLiveOffsetSmoothingFactor) {
       Assertions.checkArgument(
@@ -295,9 +305,9 @@ public final class DefaultLivePlaybackSpeedControl implements LivePlaybackSpeedC
 
   @Override
   public void setLiveConfiguration(LiveConfiguration liveConfiguration) {
-    mediaConfigurationTargetLiveOffsetUs = C.msToUs(liveConfiguration.targetOffsetMs);
-    minTargetLiveOffsetUs = C.msToUs(liveConfiguration.minOffsetMs);
-    maxTargetLiveOffsetUs = C.msToUs(liveConfiguration.maxOffsetMs);
+    mediaConfigurationTargetLiveOffsetUs = Util.msToUs(liveConfiguration.targetOffsetMs);
+    minTargetLiveOffsetUs = Util.msToUs(liveConfiguration.minOffsetMs);
+    maxTargetLiveOffsetUs = Util.msToUs(liveConfiguration.maxOffsetMs);
     minPlaybackSpeed =
         liveConfiguration.minPlaybackSpeed != C.RATE_UNSET
             ? liveConfiguration.minPlaybackSpeed
@@ -306,6 +316,10 @@ public final class DefaultLivePlaybackSpeedControl implements LivePlaybackSpeedC
         liveConfiguration.maxPlaybackSpeed != C.RATE_UNSET
             ? liveConfiguration.maxPlaybackSpeed
             : fallbackMaxPlaybackSpeed;
+    if (minPlaybackSpeed == 1f && maxPlaybackSpeed == 1f) {
+      // Don't bother calculating adjustments if it's not possible to change the speed.
+      mediaConfigurationTargetLiveOffsetUs = C.TIME_UNSET;
+    }
     maybeResetTargetLiveOffsetUs();
   }
 
@@ -416,7 +430,7 @@ public final class DefaultLivePlaybackSpeedControl implements LivePlaybackSpeedC
       // There is room for decreasing the target offset towards the ideal or safe offset (whichever
       // is larger). We want to limit the decrease so that the playback speed delta we achieve is
       // the same as the maximum delta when slowing down towards the target.
-      long minUpdateIntervalUs = C.msToUs(minUpdateIntervalMs);
+      long minUpdateIntervalUs = Util.msToUs(minUpdateIntervalMs);
       long decrementToOffsetCurrentSpeedUs =
           (long) ((adjustedPlaybackSpeed - 1f) * minUpdateIntervalUs);
       long decrementToIncreaseSpeedUs = (long) ((maxPlaybackSpeed - 1f) * minUpdateIntervalUs);

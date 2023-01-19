@@ -42,20 +42,11 @@ public final class FakeTrackSelection implements ExoTrackSelection {
     this.rendererTrackGroup = rendererTrackGroup;
   }
 
-  @Override
-  public void enable() {
-    // assert that track selection is in disabled state before this call.
-    assertThat(isEnabled).isFalse();
-    enableCount++;
-    isEnabled = true;
-  }
+  // TrackSelection implementation.
 
   @Override
-  public void disable() {
-    // assert that track selection is in enabled state before this call.
-    assertThat(isEnabled).isTrue();
-    releaseCount++;
-    isEnabled = false;
+  public int getType() {
+    return TYPE_UNSET;
   }
 
   @Override
@@ -89,6 +80,24 @@ public final class FakeTrackSelection implements ExoTrackSelection {
     return 0;
   }
 
+  // ExoTrackSelection specific methods.
+
+  @Override
+  public void enable() {
+    // assert that track selection is in disabled state before this call.
+    assertThat(isEnabled).isFalse();
+    enableCount++;
+    isEnabled = true;
+  }
+
+  @Override
+  public void disable() {
+    // assert that track selection is in enabled state before this call.
+    assertThat(isEnabled).isTrue();
+    releaseCount++;
+    isEnabled = false;
+  }
+
   @Override
   public Format getSelectedFormat() {
     return rendererTrackGroup.getFormat(0);
@@ -105,7 +114,7 @@ public final class FakeTrackSelection implements ExoTrackSelection {
   }
 
   @Override
-  public int getSelectionReason() {
+  public @C.SelectionReason int getSelectionReason() {
     return C.SELECTION_REASON_UNKNOWN;
   }
 
@@ -116,7 +125,7 @@ public final class FakeTrackSelection implements ExoTrackSelection {
   }
 
   @Override
-  public void onPlaybackSpeed(float speed) {
+  public void onPlaybackSpeed(float playbackSpeed) {
     // Do nothing.
   }
 
@@ -138,6 +147,12 @@ public final class FakeTrackSelection implements ExoTrackSelection {
 
   @Override
   public boolean blacklist(int index, long exclusionDurationMs) {
+    assertThat(isEnabled).isTrue();
+    return false;
+  }
+
+  @Override
+  public boolean isBlacklisted(int index, long nowMs) {
     assertThat(isEnabled).isTrue();
     return false;
   }

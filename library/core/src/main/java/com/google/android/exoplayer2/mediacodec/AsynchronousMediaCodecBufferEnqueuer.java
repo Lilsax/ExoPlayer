@@ -16,6 +16,7 @@
 
 package com.google.android.exoplayer2.mediacodec;
 
+import static androidx.annotation.VisibleForTesting.NONE;
 import static com.google.android.exoplayer2.util.Assertions.checkNotNull;
 import static com.google.android.exoplayer2.util.Util.castNonNull;
 
@@ -59,7 +60,6 @@ class AsynchronousMediaCodecBufferEnqueuer {
   private @MonotonicNonNull Handler handler;
   private final AtomicReference<@NullableType RuntimeException> pendingRuntimeException;
   private final ConditionVariable conditionVariable;
-  private final boolean needsSynchronizationWorkaround;
   private boolean started;
 
   /**
@@ -68,29 +68,17 @@ class AsynchronousMediaCodecBufferEnqueuer {
    * @param codec The {@link MediaCodec} to submit input buffers to.
    * @param queueingThread The {@link HandlerThread} to use for queueing buffers.
    */
-  public AsynchronousMediaCodecBufferEnqueuer(
-      MediaCodec codec,
-      HandlerThread queueingThread,
-      boolean forceQueueingSynchronizationWorkaround) {
-    this(
-        codec,
-        queueingThread,
-        forceQueueingSynchronizationWorkaround,
-        /* conditionVariable= */ new ConditionVariable());
+  public AsynchronousMediaCodecBufferEnqueuer(MediaCodec codec, HandlerThread queueingThread) {
+    this(codec, queueingThread, /* conditionVariable= */ new ConditionVariable());
   }
 
   @VisibleForTesting
   /* package */ AsynchronousMediaCodecBufferEnqueuer(
-      MediaCodec codec,
-      HandlerThread handlerThread,
-      boolean forceQueueingSynchronizationWorkaround,
-      ConditionVariable conditionVariable) {
+      MediaCodec codec, HandlerThread handlerThread, ConditionVariable conditionVariable) {
     this.codec = codec;
     this.handlerThread = handlerThread;
     this.conditionVariable = conditionVariable;
     pendingRuntimeException = new AtomicReference<>();
-    needsSynchronizationWorkaround =
-        forceQueueingSynchronizationWorkaround || needsSynchronizationWorkaround();
   }
 
   /**
@@ -160,7 +148,7 @@ class AsynchronousMediaCodecBufferEnqueuer {
     }
   }
 
-  /** Shut down the instance. Make sure to call this method to release its internal resources. */
+  /** Shuts down the instance. Make sure to call this method to release its internal resources. */
   public void shutdown() {
     if (started) {
       flush();
@@ -186,25 +174,22 @@ class AsynchronousMediaCodecBufferEnqueuer {
    * blocks until the {@link #handlerThread} is idle.
    */
   private void flushHandlerThread() throws InterruptedException {
-    Handler handler = castNonNull(this.handler);
-    handler.removeCallbacksAndMessages(null);
+    checkNotNull(this.handler).removeCallbacksAndMessages(null);
     blockUntilHandlerThreadIsIdle();
-    // Check if any exceptions happened during the last queueing action.
-    maybeThrowException();
   }
 
   private void blockUntilHandlerThreadIsIdle() throws InterruptedException {
     conditionVariable.close();
-    castNonNull(handler).obtainMessage(MSG_OPEN_CV).sendToTarget();
+    checkNotNull(handler).obtainMessage(MSG_OPEN_CV).sendToTarget();
     conditionVariable.block();
   }
 
-  // Called from the handler thread
-
-  @VisibleForTesting
+  @VisibleForTesting(otherwise = NONE)
   /* package */ void setPendingRuntimeException(RuntimeException exception) {
     pendingRuntimeException.set(exception);
   }
+
+  // Called from the handler thread
 
   private void doHandleMessage(Message msg) {
     @Nullable MessageParams params = null;
@@ -227,7 +212,8 @@ class AsynchronousMediaCodecBufferEnqueuer {
         conditionVariable.open();
         break;
       default:
-        setPendingRuntimeException(new IllegalStateException(String.valueOf(msg.what)));
+        pendingRuntimeException.compareAndSet(
+            null, new IllegalStateException(String.valueOf(msg.what)));
     }
     if (params != null) {
       recycleMessageParams(params);
@@ -239,22 +225,21 @@ class AsynchronousMediaCodecBufferEnqueuer {
     try {
       codec.queueInputBuffer(index, offset, size, presentationTimeUs, flag);
     } catch (RuntimeException e) {
-      setPendingRuntimeException(e);
+      pendingRuntimeException.compareAndSet(null, e);
     }
   }
 
   private void doQueueSecureInputBuffer(
       int index, int offset, MediaCodec.CryptoInfo info, long presentationTimeUs, int flags) {
     try {
-      if (needsSynchronizationWorkaround) {
-        synchronized (QUEUE_SECURE_LOCK) {
-          codec.queueSecureInputBuffer(index, offset, info, presentationTimeUs, flags);
-        }
-      } else {
+      // Synchronize calls to MediaCodec.queueSecureInputBuffer() to avoid race conditions inside
+      // the crypto module when audio and video are sharing the same DRM session
+      // (see [Internal: b/149908061]).
+      synchronized (QUEUE_SECURE_LOCK) {
         codec.queueSecureInputBuffer(index, offset, info, presentationTimeUs, flags);
       }
     } catch (RuntimeException e) {
-      setPendingRuntimeException(e);
+      pendingRuntimeException.compareAndSet(null, e);
     }
   }
 
@@ -296,15 +281,6 @@ class AsynchronousMediaCodecBufferEnqueuer {
       this.presentationTimeUs = presentationTimeUs;
       this.flags = flags;
     }
-  }
-
-  /**
-   * Returns whether this device needs the synchronization workaround when queueing secure input
-   * buffers (see [Internal: b/149908061]).
-   */
-  private static boolean needsSynchronizationWorkaround() {
-    String manufacturer = Util.toLowerInvariant(Util.MANUFACTURER);
-    return manufacturer.contains("samsung") || manufacturer.contains("motorola");
   }
 
   /** Performs a deep copy of {@code cryptoInfo} to {@code frameworkCryptoInfo}. */

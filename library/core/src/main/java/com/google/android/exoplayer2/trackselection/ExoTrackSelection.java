@@ -25,6 +25,7 @@ import com.google.android.exoplayer2.source.chunk.Chunk;
 import com.google.android.exoplayer2.source.chunk.MediaChunk;
 import com.google.android.exoplayer2.source.chunk.MediaChunkIterator;
 import com.google.android.exoplayer2.upstream.BandwidthMeter;
+import com.google.android.exoplayer2.util.Log;
 import java.util.List;
 import org.checkerframework.checker.nullness.compatqual.NullableType;
 
@@ -42,10 +43,10 @@ public interface ExoTrackSelection extends TrackSelection {
     public final TrackGroup group;
     /** The indices of the selected tracks in {@link #group}. */
     public final int[] tracks;
-    /** The track selection reason. One of the {@link C} SELECTION_REASON_ constants. */
-    public final int reason;
-    /** Optional data associated with this selection of tracks. */
-    @Nullable public final Object data;
+    /** The type that will be returned from {@link TrackSelection#getType()}. */
+    public final @Type int type;
+
+    private static final String TAG = "ETSDefinition";
 
     /**
      * @param group The {@link TrackGroup}. Must not be null.
@@ -53,20 +54,23 @@ public interface ExoTrackSelection extends TrackSelection {
      *     null or empty. May be in any order.
      */
     public Definition(TrackGroup group, int... tracks) {
-      this(group, tracks, C.SELECTION_REASON_UNKNOWN, /* data= */ null);
+      this(group, tracks, TrackSelection.TYPE_UNSET);
     }
 
     /**
      * @param group The {@link TrackGroup}. Must not be null.
      * @param tracks The indices of the selected tracks within the {@link TrackGroup}. Must not be
-     * @param reason The track selection reason. One of the {@link C} SELECTION_REASON_ constants.
-     * @param data Optional data associated with this selection of tracks.
+     *     null or empty. May be in any order.
+     * @param type The type that will be returned from {@link TrackSelection#getType()}.
      */
-    public Definition(TrackGroup group, int[] tracks, int reason, @Nullable Object data) {
+    public Definition(TrackGroup group, int[] tracks, @Type int type) {
+      if (tracks.length == 0) {
+        // TODO: Turn this into an assertion.
+        Log.e(TAG, "Empty tracks are not allowed", new IllegalArgumentException());
+      }
       this.group = group;
       this.tracks = tracks;
-      this.reason = reason;
-      this.data = data;
+      this.type = type;
     }
   }
 
@@ -125,6 +129,7 @@ public interface ExoTrackSelection extends TrackSelection {
   int getSelectedIndex();
 
   /** Returns the reason for the current track selection. */
+  @C.SelectionReason
   int getSelectionReason();
 
   /** Returns optional data associated with the current track selection. */
@@ -137,9 +142,9 @@ public interface ExoTrackSelection extends TrackSelection {
    * Called to notify the selection of the current playback speed. The playback speed may affect
    * adaptive track selection.
    *
-   * @param speed The factor by which playback is sped up.
+   * @param playbackSpeed The factor by which playback is sped up.
    */
-  void onPlaybackSpeed(float speed);
+  void onPlaybackSpeed(float playbackSpeed);
 
   /**
    * Called to notify the selection of a position discontinuity.
@@ -274,4 +279,13 @@ public interface ExoTrackSelection extends TrackSelection {
    * @return Whether exclusion was successful.
    */
   boolean blacklist(int index, long exclusionDurationMs);
+
+  /**
+   * Returns whether the track at the specified index in the selection is excluded.
+   *
+   * @param index The index of the track in the selection.
+   * @param nowMs The current time in the timebase of {@link
+   *     android.os.SystemClock#elapsedRealtime()}.
+   */
+  boolean isBlacklisted(int index, long nowMs);
 }

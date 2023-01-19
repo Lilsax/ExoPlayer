@@ -25,9 +25,7 @@ import com.google.android.exoplayer2.trackselection.TrackSelectorResult;
 import com.google.common.collect.ImmutableList;
 import java.util.List;
 
-/**
- * Information about an ongoing playback.
- */
+/** Information about an ongoing playback. */
 /* package */ final class PlaybackInfo {
 
   /**
@@ -50,8 +48,10 @@ import java.util.List;
    * suspended content.
    */
   public final long requestedContentPositionUs;
+  /** The start position after a reported position discontinuity, in microseconds. */
+  public final long discontinuityStartPositionUs;
   /** The current playback state. One of the {@link Player}.STATE_ constants. */
-  @Player.State public final int playbackState;
+  public final @Player.State int playbackState;
   /** The current playback error, or null if this is not an error state. */
   @Nullable public final ExoPlaybackException playbackError;
   /** Whether the player is currently loading. */
@@ -67,11 +67,9 @@ import java.util.List;
   /** Whether playback should proceed when {@link #playbackState} == {@link Player#STATE_READY}. */
   public final boolean playWhenReady;
   /** Reason why playback is suppressed even though {@link #playWhenReady} is {@code true}. */
-  @PlaybackSuppressionReason public final int playbackSuppressionReason;
+  public final @PlaybackSuppressionReason int playbackSuppressionReason;
   /** The playback parameters. */
   public final PlaybackParameters playbackParameters;
-  /** Whether offload scheduling is enabled for the main player loop. */
-  public final boolean offloadSchedulingEnabled;
   /** Whether the main player loop is sleeping, while using offload scheduling. */
   public final boolean sleepingForOffload;
 
@@ -104,6 +102,7 @@ import java.util.List;
         Timeline.EMPTY,
         PLACEHOLDER_MEDIA_PERIOD_ID,
         /* requestedContentPositionUs= */ C.TIME_UNSET,
+        /* discontinuityStartPositionUs= */ 0,
         Player.STATE_IDLE,
         /* playbackError= */ null,
         /* isLoading= */ false,
@@ -117,7 +116,6 @@ import java.util.List;
         /* bufferedPositionUs= */ 0,
         /* totalBufferedDurationUs= */ 0,
         /* positionUs= */ 0,
-        /* offloadSchedulingEnabled= */ false,
         /* sleepingForOffload= */ false);
   }
 
@@ -140,13 +138,13 @@ import java.util.List;
    * @param bufferedPositionUs See {@link #bufferedPositionUs}.
    * @param totalBufferedDurationUs See {@link #totalBufferedDurationUs}.
    * @param positionUs See {@link #positionUs}.
-   * @param offloadSchedulingEnabled See {@link #offloadSchedulingEnabled}.
    * @param sleepingForOffload See {@link #sleepingForOffload}.
    */
   public PlaybackInfo(
       Timeline timeline,
       MediaPeriodId periodId,
       long requestedContentPositionUs,
+      long discontinuityStartPositionUs,
       @Player.State int playbackState,
       @Nullable ExoPlaybackException playbackError,
       boolean isLoading,
@@ -160,11 +158,11 @@ import java.util.List;
       long bufferedPositionUs,
       long totalBufferedDurationUs,
       long positionUs,
-      boolean offloadSchedulingEnabled,
       boolean sleepingForOffload) {
     this.timeline = timeline;
     this.periodId = periodId;
     this.requestedContentPositionUs = requestedContentPositionUs;
+    this.discontinuityStartPositionUs = discontinuityStartPositionUs;
     this.playbackState = playbackState;
     this.playbackError = playbackError;
     this.isLoading = isLoading;
@@ -178,7 +176,6 @@ import java.util.List;
     this.bufferedPositionUs = bufferedPositionUs;
     this.totalBufferedDurationUs = totalBufferedDurationUs;
     this.positionUs = positionUs;
-    this.offloadSchedulingEnabled = offloadSchedulingEnabled;
     this.sleepingForOffload = sleepingForOffload;
   }
 
@@ -207,6 +204,7 @@ import java.util.List;
       MediaPeriodId periodId,
       long positionUs,
       long requestedContentPositionUs,
+      long discontinuityStartPositionUs,
       long totalBufferedDurationUs,
       TrackGroupArray trackGroups,
       TrackSelectorResult trackSelectorResult,
@@ -215,6 +213,7 @@ import java.util.List;
         timeline,
         periodId,
         requestedContentPositionUs,
+        discontinuityStartPositionUs,
         playbackState,
         playbackError,
         isLoading,
@@ -228,7 +227,6 @@ import java.util.List;
         bufferedPositionUs,
         totalBufferedDurationUs,
         positionUs,
-        offloadSchedulingEnabled,
         sleepingForOffload);
   }
 
@@ -244,6 +242,7 @@ import java.util.List;
         timeline,
         periodId,
         requestedContentPositionUs,
+        discontinuityStartPositionUs,
         playbackState,
         playbackError,
         isLoading,
@@ -257,7 +256,6 @@ import java.util.List;
         bufferedPositionUs,
         totalBufferedDurationUs,
         positionUs,
-        offloadSchedulingEnabled,
         sleepingForOffload);
   }
 
@@ -273,6 +271,7 @@ import java.util.List;
         timeline,
         periodId,
         requestedContentPositionUs,
+        discontinuityStartPositionUs,
         playbackState,
         playbackError,
         isLoading,
@@ -286,7 +285,6 @@ import java.util.List;
         bufferedPositionUs,
         totalBufferedDurationUs,
         positionUs,
-        offloadSchedulingEnabled,
         sleepingForOffload);
   }
 
@@ -302,6 +300,7 @@ import java.util.List;
         timeline,
         periodId,
         requestedContentPositionUs,
+        discontinuityStartPositionUs,
         playbackState,
         playbackError,
         isLoading,
@@ -315,7 +314,6 @@ import java.util.List;
         bufferedPositionUs,
         totalBufferedDurationUs,
         positionUs,
-        offloadSchedulingEnabled,
         sleepingForOffload);
   }
 
@@ -331,6 +329,7 @@ import java.util.List;
         timeline,
         periodId,
         requestedContentPositionUs,
+        discontinuityStartPositionUs,
         playbackState,
         playbackError,
         isLoading,
@@ -344,7 +343,6 @@ import java.util.List;
         bufferedPositionUs,
         totalBufferedDurationUs,
         positionUs,
-        offloadSchedulingEnabled,
         sleepingForOffload);
   }
 
@@ -360,6 +358,7 @@ import java.util.List;
         timeline,
         periodId,
         requestedContentPositionUs,
+        discontinuityStartPositionUs,
         playbackState,
         playbackError,
         isLoading,
@@ -373,7 +372,6 @@ import java.util.List;
         bufferedPositionUs,
         totalBufferedDurationUs,
         positionUs,
-        offloadSchedulingEnabled,
         sleepingForOffload);
   }
 
@@ -393,6 +391,7 @@ import java.util.List;
         timeline,
         periodId,
         requestedContentPositionUs,
+        discontinuityStartPositionUs,
         playbackState,
         playbackError,
         isLoading,
@@ -406,7 +405,6 @@ import java.util.List;
         bufferedPositionUs,
         totalBufferedDurationUs,
         positionUs,
-        offloadSchedulingEnabled,
         sleepingForOffload);
   }
 
@@ -422,6 +420,7 @@ import java.util.List;
         timeline,
         periodId,
         requestedContentPositionUs,
+        discontinuityStartPositionUs,
         playbackState,
         playbackError,
         isLoading,
@@ -435,37 +434,6 @@ import java.util.List;
         bufferedPositionUs,
         totalBufferedDurationUs,
         positionUs,
-        offloadSchedulingEnabled,
-        sleepingForOffload);
-  }
-
-  /**
-   * Copies playback info with new offloadSchedulingEnabled.
-   *
-   * @param offloadSchedulingEnabled New offloadSchedulingEnabled state. See {@link
-   *     #offloadSchedulingEnabled}.
-   * @return Copied playback info with new offload scheduling state.
-   */
-  @CheckResult
-  public PlaybackInfo copyWithOffloadSchedulingEnabled(boolean offloadSchedulingEnabled) {
-    return new PlaybackInfo(
-        timeline,
-        periodId,
-        requestedContentPositionUs,
-        playbackState,
-        playbackError,
-        isLoading,
-        trackGroups,
-        trackSelectorResult,
-        staticMetadata,
-        loadingMediaPeriodId,
-        playWhenReady,
-        playbackSuppressionReason,
-        playbackParameters,
-        bufferedPositionUs,
-        totalBufferedDurationUs,
-        positionUs,
-        offloadSchedulingEnabled,
         sleepingForOffload);
   }
 
@@ -481,6 +449,7 @@ import java.util.List;
         timeline,
         periodId,
         requestedContentPositionUs,
+        discontinuityStartPositionUs,
         playbackState,
         playbackError,
         isLoading,
@@ -494,7 +463,6 @@ import java.util.List;
         bufferedPositionUs,
         totalBufferedDurationUs,
         positionUs,
-        offloadSchedulingEnabled,
         sleepingForOffload);
   }
 }

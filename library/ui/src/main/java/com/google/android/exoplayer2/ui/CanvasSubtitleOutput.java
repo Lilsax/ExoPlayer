@@ -23,7 +23,6 @@ import android.graphics.Canvas;
 import android.util.AttributeSet;
 import android.view.View;
 import androidx.annotation.Nullable;
-import com.google.android.exoplayer2.text.CaptionStyleCompat;
 import com.google.android.exoplayer2.text.Cue;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -38,7 +37,7 @@ import java.util.List;
   private final List<SubtitlePainter> painters;
 
   private List<Cue> cues;
-  @Cue.TextSizeType private int textSizeType;
+  private @Cue.TextSizeType int textSizeType;
   private float textSize;
   private CaptionStyleCompat style;
   private float bottomPaddingFraction;

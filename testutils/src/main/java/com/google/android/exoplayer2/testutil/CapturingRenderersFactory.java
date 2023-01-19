@@ -20,10 +20,10 @@ import static com.google.android.exoplayer2.util.Assertions.checkState;
 
 import android.content.Context;
 import android.media.MediaCodec;
-import android.media.MediaCrypto;
 import android.media.MediaFormat;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.PersistableBundle;
 import android.util.SparseArray;
 import android.view.Surface;
 import androidx.annotation.Nullable;
@@ -32,7 +32,6 @@ import com.google.android.exoplayer2.DefaultRenderersFactory;
 import com.google.android.exoplayer2.Renderer;
 import com.google.android.exoplayer2.RenderersFactory;
 import com.google.android.exoplayer2.audio.AudioCapabilities;
-import com.google.android.exoplayer2.audio.AudioProcessor;
 import com.google.android.exoplayer2.audio.AudioRendererEventListener;
 import com.google.android.exoplayer2.audio.DefaultAudioSink;
 import com.google.android.exoplayer2.audio.MediaCodecAudioRenderer;
@@ -46,6 +45,7 @@ import com.google.android.exoplayer2.text.TextRenderer;
 import com.google.android.exoplayer2.video.MediaCodecVideoRenderer;
 import com.google.android.exoplayer2.video.VideoRendererEventListener;
 import com.google.common.collect.ImmutableList;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -94,7 +94,9 @@ public class CapturingRenderersFactory implements RenderersFactory, Dumper.Dumpa
           /* enableDecoderFallback= */ false,
           eventHandler,
           audioRendererEventListener,
-          new DefaultAudioSink(AudioCapabilities.getCapabilities(context), new AudioProcessor[0])),
+          new DefaultAudioSink.Builder()
+              .setAudioCapabilities(AudioCapabilities.getCapabilities(context))
+              .build()),
       new TextRenderer(textRendererOutput, eventHandler.getLooper()),
       new MetadataRenderer(metadataRendererOutput, eventHandler.getLooper())
     };
@@ -121,10 +123,11 @@ public class CapturingRenderersFactory implements RenderersFactory, Dumper.Dumpa
 
       @RequiresApi(18)
       @Override
-      public MediaCodecAdapter createAdapter(MediaCodec codec) {
+      public MediaCodecAdapter createAdapter(Configuration configuration) throws IOException {
         CapturingMediaCodecAdapter adapter =
             new CapturingMediaCodecAdapter(
-                MediaCodecAdapter.Factory.DEFAULT.createAdapter(codec), codec.getName());
+                MediaCodecAdapter.Factory.DEFAULT.createAdapter(configuration),
+                configuration.codecInfo.name);
         constructedAdapters.add(adapter);
         return adapter;
       }
@@ -166,20 +169,6 @@ public class CapturingRenderersFactory implements RenderersFactory, Dumper.Dumpa
     }
 
     // MediaCodecAdapter implementation
-
-    @Override
-    public void configure(
-        @Nullable MediaFormat mediaFormat,
-        @Nullable Surface surface,
-        @Nullable MediaCrypto crypto,
-        int flags) {
-      delegate.configure(mediaFormat, surface, crypto, flags);
-    }
-
-    @Override
-    public void start() {
-      delegate.start();
-    }
 
     @Override
     public int dequeueInputBufferIndex() {
@@ -275,6 +264,12 @@ public class CapturingRenderersFactory implements RenderersFactory, Dumper.Dumpa
       delegate.setVideoScalingMode(scalingMode);
     }
 
+    @RequiresApi(26)
+    @Override
+    public PersistableBundle getMetrics() {
+      return delegate.getMetrics();
+    }
+
     // Dumpable implementation
 
     @Override
@@ -289,6 +284,11 @@ public class CapturingRenderersFactory implements RenderersFactory, Dumper.Dumpa
         dumper.add("buffers[" + i + "]", inputBuffer.contents);
       }
       dumper.endBlock();
+    }
+
+    @Override
+    public boolean needsReconfiguration() {
+      return false;
     }
 
     private static byte[] peekBytes(ByteBuffer buffer, int offset, int size) {

@@ -53,12 +53,16 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
   /** {@link MediaPeriodInfo} about this media period. */
   public MediaPeriodInfo info;
   /**
-   * Whether all required renderers have been enabled with the {@link #sampleStreams} for this
+   * Whether all renderers are in the correct state for this {@link #mediaPeriod}.
+   *
+   * <p>Renderers that are needed must have been enabled with the {@link #sampleStreams} for this
    * {@link #mediaPeriod}. This means either {@link Renderer#enable(RendererConfiguration, Format[],
-   * SampleStream, long, boolean, boolean, long)} or {@link Renderer#replaceStream(Format[],
-   * SampleStream, long)} has been called.
+   * SampleStream, long, boolean, boolean, long, long)} or {@link Renderer#replaceStream(Format[],
+   * SampleStream, long, long)} has been called.
+   *
+   * <p>Renderers that are not needed must have been {@link Renderer#disable() disabled}.
    */
-  public boolean allRenderersEnabled;
+  public boolean allRenderersInCorrectState;
 
   private final boolean[] mayRetainStreamFlags;
   private final RendererCapabilities[] rendererCapabilities;
@@ -316,7 +320,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
   /** Releases the media period. No other method should be called after the release. */
   public void release() {
     disableTrackSelectionsInResult();
-    releaseMediaPeriod(info.endPositionUs, mediaSourceList, mediaPeriod);
+    releaseMediaPeriod(mediaSourceList, mediaPeriod);
   }
 
   /**
@@ -351,6 +355,15 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
   /** Returns the {@link TrackSelectorResult} which is currently applied. */
   public TrackSelectorResult getTrackSelectorResult() {
     return trackSelectorResult;
+  }
+
+  /** Updates the clipping to {@link MediaPeriodInfo#endPositionUs} if required. */
+  public void updateClipping() {
+    if (mediaPeriod instanceof ClippingMediaPeriod) {
+      long endPositionUs =
+          info.endPositionUs == C.TIME_UNSET ? C.TIME_END_OF_SOURCE : info.endPositionUs;
+      ((ClippingMediaPeriod) mediaPeriod).updateClipping(/* startUs= */ 0, endPositionUs);
+    }
   }
 
   private void enableTrackSelectionsInResult() {
@@ -418,7 +431,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
       long startPositionUs,
       long endPositionUs) {
     MediaPeriod mediaPeriod = mediaSourceList.createPeriod(id, allocator, startPositionUs);
-    if (endPositionUs != C.TIME_UNSET && endPositionUs != C.TIME_END_OF_SOURCE) {
+    if (endPositionUs != C.TIME_UNSET) {
       mediaPeriod =
           new ClippingMediaPeriod(
               mediaPeriod, /* enableInitialDiscontinuity= */ true, /* startUs= */ 0, endPositionUs);
@@ -427,10 +440,9 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
   }
 
   /** Releases the given {@code mediaPeriod}, logging and suppressing any errors. */
-  private static void releaseMediaPeriod(
-      long endPositionUs, MediaSourceList mediaSourceList, MediaPeriod mediaPeriod) {
+  private static void releaseMediaPeriod(MediaSourceList mediaSourceList, MediaPeriod mediaPeriod) {
     try {
-      if (endPositionUs != C.TIME_UNSET && endPositionUs != C.TIME_END_OF_SOURCE) {
+      if (mediaPeriod instanceof ClippingMediaPeriod) {
         mediaSourceList.releasePeriod(((ClippingMediaPeriod) mediaPeriod).mediaPeriod);
       } else {
         mediaSourceList.releasePeriod(mediaPeriod);

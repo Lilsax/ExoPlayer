@@ -25,10 +25,10 @@ android {
 }
 
 dependencies {
-    api 'com.google.ads.interactivemedia.v3:interactivemedia:3.23.0'
+    api 'com.google.ads.interactivemedia.v3:interactivemedia:3.28.1'
     implementation project(modulePrefix + 'library-core')
     implementation 'androidx.annotation:annotation:' + androidxAnnotationVersion
-    implementation 'com.google.android.gms:play-services-ads-identifier:17.0.0'
+    compileOnly 'com.google.errorprone:error_prone_annotations:' + errorProneVersion
     compileOnly 'org.checkerframework:checker-qual:' + checkerframeworkVersion
     compileOnly 'org.jetbrains.kotlin:kotlin-annotations-jvm:' + kotlinAnnotationsVersion
     androidTestImplementation project(modulePrefix + 'testutils')
@@ -46,7 +46,7 @@ ext {
 apply from: '../../javadoc_library.gradle'
 
 ext {
-    releaseArtifact = 'extension-ima'
+    releaseArtifactId = 'extension-ima'
     releaseDescription = 'Interactive Media Ads extension for ExoPlayer.'
 }
 apply from: '../../publish.gradle'

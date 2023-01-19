@@ -29,9 +29,7 @@ import com.google.android.exoplayer2.text.webvtt.Mp4WebvttDecoder;
 import com.google.android.exoplayer2.text.webvtt.WebvttDecoder;
 import com.google.android.exoplayer2.util.MimeTypes;
 
-/**
- * A factory for {@link SubtitleDecoder} instances.
- */
+/** A factory for {@link SubtitleDecoder} instances. */
 public interface SubtitleDecoderFactory {
 
   /**
@@ -68,6 +66,7 @@ public interface SubtitleDecoderFactory {
    *   <li>Cea708 ({@link Cea708Decoder})
    *   <li>DVB ({@link DvbDecoder})
    *   <li>PGS ({@link PgsDecoder})
+   *   <li>Exoplayer Cues ({@link ExoplayerCuesDecoder})
    * </ul>
    */
   SubtitleDecoderFactory DEFAULT =
@@ -86,7 +85,8 @@ public interface SubtitleDecoderFactory {
               || MimeTypes.APPLICATION_MP4CEA608.equals(mimeType)
               || MimeTypes.APPLICATION_CEA708.equals(mimeType)
               || MimeTypes.APPLICATION_DVBSUBS.equals(mimeType)
-              || MimeTypes.APPLICATION_PGS.equals(mimeType);
+              || MimeTypes.APPLICATION_PGS.equals(mimeType)
+              || MimeTypes.TEXT_EXOPLAYER_CUES.equals(mimeType);
         }
 
         @Override
@@ -118,6 +118,8 @@ public interface SubtitleDecoderFactory {
                 return new DvbDecoder(format.initializationData);
               case MimeTypes.APPLICATION_PGS:
                 return new PgsDecoder();
+              case MimeTypes.TEXT_EXOPLAYER_CUES:
+                return new ExoplayerCuesDecoder();
               default:
                 break;
             }

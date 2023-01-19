@@ -17,17 +17,14 @@ package com.google.android.exoplayer2.upstream;
 
 import android.os.Handler;
 import androidx.annotation.Nullable;
+import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.util.Assertions;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/**
- * Provides estimates of the currently available bandwidth.
- */
+/** Provides estimates of the currently available bandwidth. */
 public interface BandwidthMeter {
 
-  /**
-   * A listener of {@link BandwidthMeter} events.
-   */
+  /** A listener of {@link BandwidthMeter} events. */
   interface EventListener {
 
     /**
@@ -105,6 +102,14 @@ public interface BandwidthMeter {
 
   /** Returns the estimated bitrate. */
   long getBitrateEstimate();
+
+  /**
+   * Returns the estimated time to first byte, in microseconds, or {@link C#TIME_UNSET} if no
+   * estimate is available.
+   */
+  default long getTimeToFirstByteEstimateUs() {
+    return C.TIME_UNSET;
+  }
 
   /**
    * Returns the {@link TransferListener} that this instance uses to gather bandwidth information

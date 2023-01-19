@@ -22,14 +22,15 @@ import android.net.Uri;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import com.google.android.exoplayer2.C;
+import com.google.android.exoplayer2.analytics.PlayerId;
 import com.google.android.exoplayer2.drm.DrmSessionEventListener;
 import com.google.android.exoplayer2.drm.DrmSessionManager;
-import com.google.android.exoplayer2.extractor.Extractor;
 import com.google.android.exoplayer2.extractor.mp4.Mp4Extractor;
 import com.google.android.exoplayer2.source.MediaSource.MediaPeriodId;
 import com.google.android.exoplayer2.upstream.AssetDataSource;
 import com.google.android.exoplayer2.upstream.DefaultAllocator;
 import com.google.android.exoplayer2.upstream.DefaultLoadErrorHandlingPolicy;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -39,7 +40,21 @@ import org.junit.runner.RunWith;
 public final class ProgressiveMediaPeriodTest {
 
   @Test
-  public void prepare_updatesSourceInfoBeforeOnPreparedCallback() throws Exception {
+  public void prepareUsingBundledExtractors_updatesSourceInfoBeforeOnPreparedCallback()
+      throws TimeoutException {
+    testExtractorsUpdatesSourceInfoBeforeOnPreparedCallback(
+        new BundledExtractorsAdapter(Mp4Extractor.FACTORY));
+  }
+
+  @Test
+  public void prepareUsingMediaParser_updatesSourceInfoBeforeOnPreparedCallback()
+      throws TimeoutException {
+    testExtractorsUpdatesSourceInfoBeforeOnPreparedCallback(
+        new MediaParserExtractorAdapter(PlayerId.UNSET));
+  }
+
+  private static void testExtractorsUpdatesSourceInfoBeforeOnPreparedCallback(
+      ProgressiveMediaExtractor extractor) throws TimeoutException {
     AtomicBoolean sourceInfoRefreshCalled = new AtomicBoolean(false);
     ProgressiveMediaPeriod.Listener sourceInfoRefreshListener =
         (durationUs, isSeekable, isLive) -> sourceInfoRefreshCalled.set(true);
@@ -48,7 +63,7 @@ public final class ProgressiveMediaPeriodTest {
         new ProgressiveMediaPeriod(
             Uri.parse("asset://android_asset/media/mp4/sample.mp4"),
             new AssetDataSource(ApplicationProvider.getApplicationContext()),
-            () -> new Extractor[] {new Mp4Extractor()},
+            extractor,
             DrmSessionManager.DRM_UNSUPPORTED,
             new DrmSessionEventListener.EventDispatcher()
                 .withParameters(/* windowIndex= */ 0, mediaPeriodId),

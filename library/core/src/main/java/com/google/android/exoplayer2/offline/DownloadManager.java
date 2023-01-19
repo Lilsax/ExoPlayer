@@ -33,6 +33,7 @@ import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.Message;
 import androidx.annotation.CheckResult;
+import androidx.annotation.IntRange;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.database.DatabaseProvider;
@@ -255,7 +256,7 @@ public final class DownloadManager {
     downloads = Collections.emptyList();
     listeners = new CopyOnWriteArraySet<>();
 
-    @SuppressWarnings("methodref.receiver.bound.invalid")
+    @SuppressWarnings("nullness:methodref.receiver.bound")
     Handler mainHandler = Util.createHandlerForCurrentOrMainLooper(this::handleMainMessage);
     this.applicationHandler = mainHandler;
     HandlerThread internalThread = new HandlerThread("ExoPlayer:DownloadManager");
@@ -270,7 +271,7 @@ public final class DownloadManager {
             minRetryCount,
             downloadsPaused);
 
-    @SuppressWarnings("methodref.receiver.bound.invalid")
+    @SuppressWarnings("nullness:methodref.receiver.bound")
     RequirementsWatcher.Listener requirementsListener = this::onRequirementsStateChanged;
     this.requirementsListener = requirementsListener;
     requirementsWatcher =
@@ -348,8 +349,7 @@ public final class DownloadManager {
    *
    * @return The not met {@link Requirements.RequirementFlags}, or 0 if all requirements are met.
    */
-  @Requirements.RequirementFlags
-  public int getNotMetRequirements() {
+  public @Requirements.RequirementFlags int getNotMetRequirements() {
     return notMetRequirements;
   }
 
@@ -378,7 +378,7 @@ public final class DownloadManager {
    *
    * @param maxParallelDownloads The maximum number of parallel downloads. Must be greater than 0.
    */
-  public void setMaxParallelDownloads(int maxParallelDownloads) {
+  public void setMaxParallelDownloads(@IntRange(from = 1) int maxParallelDownloads) {
     Assertions.checkArgument(maxParallelDownloads > 0);
     if (this.maxParallelDownloads == maxParallelDownloads) {
       return;
@@ -531,6 +531,7 @@ public final class DownloadManager {
         Thread.currentThread().interrupt();
       }
       applicationHandler.removeCallbacksAndMessages(/* token= */ null);
+      requirementsWatcher.stop();
       // Reset state.
       downloads = Collections.emptyList();
       pendingMessages = 0;
@@ -702,11 +703,12 @@ public final class DownloadManager {
     private final ArrayList<Download> downloads;
     private final HashMap<String, Task> activeTasks;
 
-    @Requirements.RequirementFlags private int notMetRequirements;
+    private @Requirements.RequirementFlags int notMetRequirements;
     private boolean downloadsPaused;
     private int maxParallelDownloads;
     private int minRetryCount;
     private int activeDownloadTaskCount;
+    private boolean hasActiveRemoveTask;
 
     public InternalHandler(
         HandlerThread thread,
@@ -1058,6 +1060,10 @@ public final class DownloadManager {
         return;
       }
 
+      if (hasActiveRemoveTask) {
+        return;
+      }
+
       // We can start a remove task.
       Downloader downloader = downloaderFactory.createDownloader(download.request);
       activeTask =
@@ -1069,6 +1075,7 @@ public final class DownloadManager {
               minRetryCount,
               /* internalHandler= */ this);
       activeTasks.put(download.request.id, activeTask);
+      hasActiveRemoveTask = true;
       activeTask.start();
     }
 
@@ -1098,7 +1105,9 @@ public final class DownloadManager {
       activeTasks.remove(downloadId);
 
       boolean isRemove = task.isRemove;
-      if (!isRemove && --activeDownloadTaskCount == 0) {
+      if (isRemove) {
+        hasActiveRemoveTask = false;
+      } else if (--activeDownloadTaskCount == 0) {
         removeMessages(MSG_UPDATE_PROGRESS);
       }
 
@@ -1316,7 +1325,7 @@ public final class DownloadManager {
       contentLength = C.LENGTH_UNSET;
     }
 
-    @SuppressWarnings("nullness:assignment.type.incompatible")
+    @SuppressWarnings("nullness:assignment")
     public void cancel(boolean released) {
       if (released) {
         // Download threads are GC roots for as long as they're running. The time taken for

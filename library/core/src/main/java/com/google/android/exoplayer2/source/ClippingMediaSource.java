@@ -17,26 +17,27 @@ package com.google.android.exoplayer2.source;
 
 import static java.lang.Math.max;
 import static java.lang.Math.min;
+import static java.lang.annotation.ElementType.TYPE_USE;
 
 import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
-import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.Timeline;
 import com.google.android.exoplayer2.upstream.Allocator;
-import com.google.android.exoplayer2.upstream.TransferListener;
 import com.google.android.exoplayer2.util.Assertions;
+import com.google.android.exoplayer2.util.Util;
 import java.io.IOException;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.util.ArrayList;
 
 /**
  * {@link MediaSource} that wraps a source and clips its timeline based on specified start/end
  * positions. The wrapped source must consist of a single period.
  */
-public final class ClippingMediaSource extends CompositeMediaSource<Void> {
+public final class ClippingMediaSource extends WrappingMediaSource {
 
   /** Thrown when a {@link ClippingMediaSource} cannot clip its wrapped source. */
   public static final class IllegalClippingException extends IOException {
@@ -47,6 +48,7 @@ public final class ClippingMediaSource extends CompositeMediaSource<Void> {
      */
     @Documented
     @Retention(RetentionPolicy.SOURCE)
+    @Target(TYPE_USE)
     @IntDef({REASON_INVALID_PERIOD_COUNT, REASON_NOT_SEEKABLE_TO_START, REASON_START_EXCEEDS_END})
     public @interface Reason {}
     /** The wrapped source doesn't consist of a single period. */
@@ -81,7 +83,6 @@ public final class ClippingMediaSource extends CompositeMediaSource<Void> {
     }
   }
 
-  private final MediaSource mediaSource;
   private final long startUs;
   private final long endUs;
   private final boolean enableInitialDiscontinuity;
@@ -177,8 +178,8 @@ public final class ClippingMediaSource extends CompositeMediaSource<Void> {
       boolean enableInitialDiscontinuity,
       boolean allowDynamicClippingUpdates,
       boolean relativeToDefaultPosition) {
+    super(Assertions.checkNotNull(mediaSource));
     Assertions.checkArgument(startPositionUs >= 0);
-    this.mediaSource = Assertions.checkNotNull(mediaSource);
     startUs = startPositionUs;
     endUs = endPositionUs;
     this.enableInitialDiscontinuity = enableInitialDiscontinuity;
@@ -186,28 +187,6 @@ public final class ClippingMediaSource extends CompositeMediaSource<Void> {
     this.relativeToDefaultPosition = relativeToDefaultPosition;
     mediaPeriods = new ArrayList<>();
     window = new Timeline.Window();
-  }
-
-  /**
-   * @deprecated Use {@link #getMediaItem()} and {@link MediaItem.PlaybackProperties#tag} instead.
-   */
-  @SuppressWarnings("deprecation")
-  @Deprecated
-  @Override
-  @Nullable
-  public Object getTag() {
-    return mediaSource.getTag();
-  }
-
-  @Override
-  public MediaItem getMediaItem() {
-    return mediaSource.getMediaItem();
-  }
-
-  @Override
-  protected void prepareSourceInternal(@Nullable TransferListener mediaTransferListener) {
-    super.prepareSourceInternal(mediaTransferListener);
-    prepareChildSource(/* id= */ null, mediaSource);
   }
 
   @Override
@@ -247,11 +226,11 @@ public final class ClippingMediaSource extends CompositeMediaSource<Void> {
   }
 
   @Override
-  protected void onChildSourceInfoRefreshed(Void id, MediaSource mediaSource, Timeline timeline) {
+  protected void onChildSourceInfoRefreshed(Timeline newTimeline) {
     if (clippingError != null) {
       return;
     }
-    refreshClippedTimeline(timeline);
+    refreshClippedTimeline(newTimeline);
   }
 
   private void refreshClippedTimeline(Timeline timeline) {
@@ -288,27 +267,17 @@ public final class ClippingMediaSource extends CompositeMediaSource<Void> {
       clippingTimeline = new ClippingTimeline(timeline, windowStartUs, windowEndUs);
     } catch (IllegalClippingException e) {
       clippingError = e;
+      // The clipping error won't be propagated while we have existing MediaPeriods. Setting the
+      // error at the MediaPeriods ensures it will be thrown as soon as possible.
+      for (int i = 0; i < mediaPeriods.size(); i++) {
+        mediaPeriods.get(i).setClippingError(clippingError);
+      }
       return;
     }
     refreshSourceInfo(clippingTimeline);
   }
 
-  @Override
-  protected long getMediaTimeForChildMediaTime(Void id, long mediaTimeMs) {
-    if (mediaTimeMs == C.TIME_UNSET) {
-      return C.TIME_UNSET;
-    }
-    long startMs = C.usToMs(startUs);
-    long clippedTimeMs = max(0, mediaTimeMs - startMs);
-    if (endUs != C.TIME_END_OF_SOURCE) {
-      clippedTimeMs = min(C.usToMs(endUs) - startMs, clippedTimeMs);
-    }
-    return clippedTimeMs;
-  }
-
-  /**
-   * Provides a clipped view of a specified timeline.
-   */
+  /** Provides a clipped view of a specified timeline. */
   private static final class ClippingTimeline extends ForwardingTimeline {
 
     private final long startUs;
@@ -366,7 +335,7 @@ public final class ClippingMediaSource extends CompositeMediaSource<Void> {
             endUs == C.TIME_UNSET ? window.defaultPositionUs : min(window.defaultPositionUs, endUs);
         window.defaultPositionUs -= startUs;
       }
-      long startMs = C.usToMs(startUs);
+      long startMs = Util.usToMs(startUs);
       if (window.presentationStartTimeMs != C.TIME_UNSET) {
         window.presentationStartTimeMs += startMs;
       }

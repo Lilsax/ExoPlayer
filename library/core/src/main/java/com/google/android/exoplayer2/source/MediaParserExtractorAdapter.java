@@ -26,19 +26,28 @@ import android.net.Uri;
 import android.util.Pair;
 import androidx.annotation.RequiresApi;
 import com.google.android.exoplayer2.C;
+import com.google.android.exoplayer2.analytics.PlayerId;
 import com.google.android.exoplayer2.extractor.Extractor;
 import com.google.android.exoplayer2.extractor.ExtractorOutput;
 import com.google.android.exoplayer2.extractor.PositionHolder;
 import com.google.android.exoplayer2.source.mediaparser.InputReaderAdapterV30;
+import com.google.android.exoplayer2.source.mediaparser.MediaParserUtil;
 import com.google.android.exoplayer2.source.mediaparser.OutputConsumerAdapterV30;
 import com.google.android.exoplayer2.upstream.DataReader;
+import com.google.android.exoplayer2.util.Util;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
 /** {@link ProgressiveMediaExtractor} implemented on top of the platform's {@link MediaParser}. */
 @RequiresApi(30)
-/* package */ final class MediaParserExtractorAdapter implements ProgressiveMediaExtractor {
+public final class MediaParserExtractorAdapter implements ProgressiveMediaExtractor {
+
+  /**
+   * A {@link ProgressiveMediaExtractor.Factory} for instances of this class, which rely on platform
+   * extractors through {@link MediaParser}.
+   */
+  public static final ProgressiveMediaExtractor.Factory FACTORY = MediaParserExtractorAdapter::new;
 
   private final OutputConsumerAdapterV30 outputConsumerAdapter;
   private final InputReaderAdapterV30 inputReaderAdapter;
@@ -46,7 +55,7 @@ import java.util.Map;
   private String parserName;
 
   @SuppressLint("WrongConstant")
-  public MediaParserExtractorAdapter() {
+  public MediaParserExtractorAdapter(PlayerId playerId) {
     // TODO: Add support for injecting the desired extractor list.
     outputConsumerAdapter = new OutputConsumerAdapterV30();
     inputReaderAdapter = new InputReaderAdapterV30();
@@ -55,6 +64,9 @@ import java.util.Map;
     mediaParser.setParameter(PARAMETER_IN_BAND_CRYPTO_INFO, true);
     mediaParser.setParameter(PARAMETER_INCLUDE_SUPPLEMENTAL_DATA, true);
     parserName = MediaParser.PARSER_NAME_UNKNOWN;
+    if (Util.SDK_INT >= 31) {
+      MediaParserUtil.setLogSessionIdOnMediaParser(mediaParser, playerId);
+    }
   }
 
   @Override

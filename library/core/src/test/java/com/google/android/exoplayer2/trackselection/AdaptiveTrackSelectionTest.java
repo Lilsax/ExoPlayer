@@ -25,6 +25,7 @@ import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.Timeline;
 import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.source.TrackGroup;
+import com.google.android.exoplayer2.source.chunk.BaseMediaChunkIterator;
 import com.google.android.exoplayer2.source.chunk.MediaChunkIterator;
 import com.google.android.exoplayer2.testutil.FakeClock;
 import com.google.android.exoplayer2.testutil.FakeMediaChunk;
@@ -32,6 +33,7 @@ import com.google.android.exoplayer2.testutil.FakeTimeline;
 import com.google.android.exoplayer2.trackselection.AdaptiveTrackSelection.AdaptationCheckpoint;
 import com.google.android.exoplayer2.trackselection.ExoTrackSelection.Definition;
 import com.google.android.exoplayer2.upstream.BandwidthMeter;
+import com.google.android.exoplayer2.upstream.DataSpec;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
@@ -46,10 +48,7 @@ import org.mockito.Mock;
 @RunWith(AndroidJUnit4.class)
 public final class AdaptiveTrackSelectionTest {
 
-  private static final MediaChunkIterator[] THREE_EMPTY_MEDIA_CHUNK_ITERATORS =
-      new MediaChunkIterator[] {
-        MediaChunkIterator.EMPTY, MediaChunkIterator.EMPTY, MediaChunkIterator.EMPTY
-      };
+  private static final long TEST_CHUNK_DURATION_US = 2_000_000;
 
   @Mock private BandwidthMeter mockBandwidthMeter;
   private FakeClock fakeClock;
@@ -58,33 +57,53 @@ public final class AdaptiveTrackSelectionTest {
   public void setUp() {
     initMocks(this);
     fakeClock = new FakeClock(0);
+    when(mockBandwidthMeter.getTimeToFirstByteEstimateUs()).thenReturn(C.TIME_UNSET);
   }
 
   @Test
-  public void selectInitialIndexUseMaxInitialBitrateIfNoBandwidthEstimate() {
+  public void initial_updateSelectedTrack_selectsHighestBitrateWithinBandwidth() {
     Format format1 = videoFormat(/* bitrate= */ 500, /* width= */ 320, /* height= */ 240);
     Format format2 = videoFormat(/* bitrate= */ 1000, /* width= */ 640, /* height= */ 480);
     Format format3 = videoFormat(/* bitrate= */ 2000, /* width= */ 960, /* height= */ 720);
     TrackGroup trackGroup = new TrackGroup(format1, format2, format3);
 
     when(mockBandwidthMeter.getBitrateEstimate()).thenReturn(1000L);
-    AdaptiveTrackSelection adaptiveTrackSelection = adaptiveTrackSelection(trackGroup);
+    AdaptiveTrackSelection adaptiveTrackSelection =
+        prepareAdaptiveTrackSelectionWithBandwidthFraction(trackGroup, /* bandwidthFraction= */ 1f);
 
     assertThat(adaptiveTrackSelection.getSelectedFormat()).isEqualTo(format2);
     assertThat(adaptiveTrackSelection.getSelectionReason()).isEqualTo(C.SELECTION_REASON_INITIAL);
   }
 
   @Test
-  public void selectInitialIndexUseBandwidthEstimateIfAvailable() {
+  public void initial_updateSelectedTrack_selectsHighestBitrateWithinBandwidthFraction() {
     Format format1 = videoFormat(/* bitrate= */ 500, /* width= */ 320, /* height= */ 240);
     Format format2 = videoFormat(/* bitrate= */ 1000, /* width= */ 640, /* height= */ 480);
     Format format3 = videoFormat(/* bitrate= */ 2000, /* width= */ 960, /* height= */ 720);
     TrackGroup trackGroup = new TrackGroup(format1, format2, format3);
 
-    when(mockBandwidthMeter.getBitrateEstimate()).thenReturn(500L);
-    AdaptiveTrackSelection adaptiveTrackSelection = adaptiveTrackSelection(trackGroup);
+    when(mockBandwidthMeter.getBitrateEstimate()).thenReturn(2000L);
+    AdaptiveTrackSelection adaptiveTrackSelection =
+        prepareAdaptiveTrackSelectionWithBandwidthFraction(
+            trackGroup, /* bandwidthFraction= */ 0.5f);
 
-    assertThat(adaptiveTrackSelection.getSelectedFormat()).isEqualTo(format1);
+    assertThat(adaptiveTrackSelection.getSelectedFormat()).isEqualTo(format2);
+    assertThat(adaptiveTrackSelection.getSelectionReason()).isEqualTo(C.SELECTION_REASON_INITIAL);
+  }
+
+  @Test
+  public void initial_updateSelectedTrack_selectsHighestBitrateWithinBandwidthAndTimeToFirstByte() {
+    Format format1 = videoFormat(/* bitrate= */ 500, /* width= */ 320, /* height= */ 240);
+    Format format2 = videoFormat(/* bitrate= */ 1000, /* width= */ 640, /* height= */ 480);
+    Format format3 = videoFormat(/* bitrate= */ 2000, /* width= */ 960, /* height= */ 720);
+    TrackGroup trackGroup = new TrackGroup(format1, format2, format3);
+
+    when(mockBandwidthMeter.getBitrateEstimate()).thenReturn(2000L);
+    when(mockBandwidthMeter.getTimeToFirstByteEstimateUs()).thenReturn(1_000_000L);
+    AdaptiveTrackSelection adaptiveTrackSelection =
+        prepareAdaptiveTrackSelectionWithBandwidthFraction(trackGroup, /* bandwidthFraction= */ 1f);
+
+    assertThat(adaptiveTrackSelection.getSelectedFormat()).isEqualTo(format2);
     assertThat(adaptiveTrackSelection.getSelectionReason()).isEqualTo(C.SELECTION_REASON_INITIAL);
   }
 
@@ -99,7 +118,7 @@ public final class AdaptiveTrackSelectionTest {
     // if possible.
     when(mockBandwidthMeter.getBitrateEstimate()).thenReturn(1000L, 2000L);
     AdaptiveTrackSelection adaptiveTrackSelection =
-        adaptiveTrackSelectionWithMinDurationForQualityIncreaseMs(
+        prepareAdaptiveTrackSelectionWithMinDurationForQualityIncreaseMs(
             trackGroup, /* minDurationForQualityIncreaseMs= */ 10_000);
 
     adaptiveTrackSelection.updateSelectedTrack(
@@ -107,7 +126,7 @@ public final class AdaptiveTrackSelectionTest {
         /* bufferedDurationUs= */ 9_999_000,
         /* availableDurationUs= */ C.TIME_UNSET,
         /* queue= */ Collections.emptyList(),
-        /* mediaChunkIterators= */ THREE_EMPTY_MEDIA_CHUNK_ITERATORS);
+        createMediaChunkIterators(trackGroup, TEST_CHUNK_DURATION_US));
 
     // When bandwidth estimation is updated to 2000L, we can switch up to use a higher bitrate
     // format. However, since we only buffered 9_999_000 us, which is smaller than
@@ -127,7 +146,7 @@ public final class AdaptiveTrackSelectionTest {
     // if possible.
     when(mockBandwidthMeter.getBitrateEstimate()).thenReturn(1000L, 2000L);
     AdaptiveTrackSelection adaptiveTrackSelection =
-        adaptiveTrackSelectionWithMinDurationForQualityIncreaseMs(
+        prepareAdaptiveTrackSelectionWithMinDurationForQualityIncreaseMs(
             trackGroup, /* minDurationForQualityIncreaseMs= */ 10_000);
 
     adaptiveTrackSelection.updateSelectedTrack(
@@ -135,13 +154,51 @@ public final class AdaptiveTrackSelectionTest {
         /* bufferedDurationUs= */ 10_000_000,
         /* availableDurationUs= */ C.TIME_UNSET,
         /* queue= */ Collections.emptyList(),
-        /* mediaChunkIterators= */ THREE_EMPTY_MEDIA_CHUNK_ITERATORS);
+        createMediaChunkIterators(trackGroup, TEST_CHUNK_DURATION_US));
 
     // When bandwidth estimation is updated to 2000L, we can switch up to use a higher bitrate
     // format. When we have buffered enough (10_000_000 us, which is equal to
     // minDurationForQualityIncreaseMs), we should switch up now.
     assertThat(adaptiveTrackSelection.getSelectedFormat()).isEqualTo(format3);
     assertThat(adaptiveTrackSelection.getSelectionReason()).isEqualTo(C.SELECTION_REASON_ADAPTIVE);
+  }
+
+  @Test
+  public void updateSelectedTrack_liveStream_switchesUpWhenBufferedFractionToLiveEdgeReached() {
+    Format format1 = videoFormat(/* bitrate= */ 500, /* width= */ 320, /* height= */ 240);
+    Format format2 = videoFormat(/* bitrate= */ 1000, /* width= */ 640, /* height= */ 480);
+    Format format3 = videoFormat(/* bitrate= */ 2000, /* width= */ 960, /* height= */ 720);
+    TrackGroup trackGroup = new TrackGroup(format1, format2, format3);
+    // The second measurement onward returns 2000L, which prompts the track selection to switch up
+    // if possible.
+    when(mockBandwidthMeter.getBitrateEstimate()).thenReturn(1000L, 2000L);
+    AdaptiveTrackSelection adaptiveTrackSelection =
+        prepareAdaptiveTrackSelectionWithBufferedFractionToLiveEdgeForQualiyIncrease(
+            trackGroup,
+            /* bufferedFractionToLiveEdgeForQualityIncrease= */ 0.75f,
+            /* minDurationForQualityIncreaseMs= */ 5000);
+
+    // Not buffered close to live edge yet.
+    adaptiveTrackSelection.updateSelectedTrack(
+        /* playbackPositionUs= */ 0,
+        /* bufferedDurationUs= */ 1_600_000,
+        /* availableDurationUs= */ 5_600_000,
+        /* queue= */ ImmutableList.of(),
+        createMediaChunkIterators(trackGroup, /* chunkDurationUs= */ 2_000_000));
+
+    assertThat(adaptiveTrackSelection.getSelectedFormat()).isEqualTo(format2);
+
+    // Buffered all possible chunks (except for newly added chunk of 2 seconds).
+    // Intentionally choose a situation where availableDurationUs > minDurationForQualityIncreaseMs
+    // to ensure the live calculation is used regardless.
+    adaptiveTrackSelection.updateSelectedTrack(
+        /* playbackPositionUs= */ 0,
+        /* bufferedDurationUs= */ 3_600_000,
+        /* availableDurationUs= */ 5_600_000,
+        /* queue= */ ImmutableList.of(),
+        createMediaChunkIterators(trackGroup, /* chunkDurationUs= */ 2_000_000));
+
+    assertThat(adaptiveTrackSelection.getSelectedFormat()).isEqualTo(format3);
   }
 
   @Test
@@ -155,7 +212,7 @@ public final class AdaptiveTrackSelectionTest {
     // if necessary.
     when(mockBandwidthMeter.getBitrateEstimate()).thenReturn(1000L, 500L);
     AdaptiveTrackSelection adaptiveTrackSelection =
-        adaptiveTrackSelectionWithMaxDurationForQualityDecreaseMs(
+        prepareAdaptiveTrackSelectionWithMaxDurationForQualityDecreaseMs(
             trackGroup, /* maxDurationForQualityDecreaseMs= */ 25_000);
 
     adaptiveTrackSelection.updateSelectedTrack(
@@ -163,7 +220,7 @@ public final class AdaptiveTrackSelectionTest {
         /* bufferedDurationUs= */ 25_000_000,
         /* availableDurationUs= */ C.TIME_UNSET,
         /* queue= */ Collections.emptyList(),
-        /* mediaChunkIterators= */ THREE_EMPTY_MEDIA_CHUNK_ITERATORS);
+        createMediaChunkIterators(trackGroup, TEST_CHUNK_DURATION_US));
 
     // When bandwidth estimation is updated to 500L, we should switch down to use a lower bitrate
     // format. However, since we have enough buffer at higher quality (25_000_000 us, which is equal
@@ -183,7 +240,7 @@ public final class AdaptiveTrackSelectionTest {
     // if necessary.
     when(mockBandwidthMeter.getBitrateEstimate()).thenReturn(1000L, 500L);
     AdaptiveTrackSelection adaptiveTrackSelection =
-        adaptiveTrackSelectionWithMaxDurationForQualityDecreaseMs(
+        prepareAdaptiveTrackSelectionWithMaxDurationForQualityDecreaseMs(
             trackGroup, /* maxDurationForQualityDecreaseMs= */ 25_000);
 
     adaptiveTrackSelection.updateSelectedTrack(
@@ -191,7 +248,7 @@ public final class AdaptiveTrackSelectionTest {
         /* bufferedDurationUs= */ 24_999_000,
         /* availableDurationUs= */ C.TIME_UNSET,
         /* queue= */ Collections.emptyList(),
-        /* mediaChunkIterators= */ THREE_EMPTY_MEDIA_CHUNK_ITERATORS);
+        createMediaChunkIterators(trackGroup, TEST_CHUNK_DURATION_US));
 
     // When bandwidth estimation is updated to 500L, we should switch down to use a lower bitrate
     // format. When we don't have enough buffer at higher quality (24_999_000 us is smaller than
@@ -213,13 +270,10 @@ public final class AdaptiveTrackSelectionTest {
         new FakeMediaChunk(format1, /* startTimeUs= */ 10_000_000, /* endTimeUs= */ 20_000_000);
     FakeMediaChunk chunk3 =
         new FakeMediaChunk(format1, /* startTimeUs= */ 20_000_000, /* endTimeUs= */ 30_000_000);
-    List<FakeMediaChunk> queue = new ArrayList<>();
-    queue.add(chunk1);
-    queue.add(chunk2);
-    queue.add(chunk3);
+    List<FakeMediaChunk> queue = ImmutableList.of(chunk1, chunk2, chunk3);
 
     when(mockBandwidthMeter.getBitrateEstimate()).thenReturn(500L);
-    AdaptiveTrackSelection adaptiveTrackSelection = adaptiveTrackSelection(trackGroup);
+    AdaptiveTrackSelection adaptiveTrackSelection = prepareAdaptiveTrackSelection(trackGroup);
 
     int size = adaptiveTrackSelection.evaluateQueueSize(0, queue);
     assertThat(size).isEqualTo(3);
@@ -238,14 +292,11 @@ public final class AdaptiveTrackSelectionTest {
         new FakeMediaChunk(format1, /* startTimeUs= */ 10_000_000, /* endTimeUs= */ 20_000_000);
     FakeMediaChunk chunk3 =
         new FakeMediaChunk(format1, /* startTimeUs= */ 20_000_000, /* endTimeUs= */ 30_000_000);
-    List<FakeMediaChunk> queue = new ArrayList<>();
-    queue.add(chunk1);
-    queue.add(chunk2);
-    queue.add(chunk3);
+    List<FakeMediaChunk> queue = ImmutableList.of(chunk1, chunk2, chunk3);
 
     when(mockBandwidthMeter.getBitrateEstimate()).thenReturn(500L);
     AdaptiveTrackSelection adaptiveTrackSelection =
-        adaptiveTrackSelectionWithMinTimeBetweenBufferReevaluationMs(
+        prepareAdaptiveTrackSelectionWithMinTimeBetweenBufferReevaluationMs(
             trackGroup, /* durationToRetainAfterDiscardMs= */ 15_000);
 
     int initialQueueSize = adaptiveTrackSelection.evaluateQueueSize(0, queue);
@@ -278,14 +329,11 @@ public final class AdaptiveTrackSelectionTest {
         new FakeMediaChunk(format1, /* startTimeUs= */ 10_000_000, /* endTimeUs= */ 20_000_000);
     FakeMediaChunk chunk3 =
         new FakeMediaChunk(format1, /* startTimeUs= */ 20_000_000, /* endTimeUs= */ 30_000_000);
-    List<FakeMediaChunk> queue = new ArrayList<>();
-    queue.add(chunk1);
-    queue.add(chunk2);
-    queue.add(chunk3);
+    List<FakeMediaChunk> queue = ImmutableList.of(chunk1, chunk2, chunk3);
 
     when(mockBandwidthMeter.getBitrateEstimate()).thenReturn(500L);
     AdaptiveTrackSelection adaptiveTrackSelection =
-        adaptiveTrackSelectionWithMinTimeBetweenBufferReevaluationMs(
+        prepareAdaptiveTrackSelectionWithMinTimeBetweenBufferReevaluationMs(
             trackGroup, /* durationToRetainAfterDiscardMs= */ 15_000);
 
     int initialQueueSize = adaptiveTrackSelection.evaluateQueueSize(0, queue);
@@ -303,6 +351,45 @@ public final class AdaptiveTrackSelectionTest {
   }
 
   @Test
+  public void evaluateQueueSizeDiscardChunksLessThanOrEqualToMaximumResolution() {
+    Format format1 = videoFormat(/* bitrate= */ 500, /* width= */ 320, /* height= */ 240);
+    Format format2 = videoFormat(/* bitrate= */ 1000, /* width= */ 640, /* height= */ 480);
+    Format format3 = videoFormat(/* bitrate= */ 2000, /* width= */ 960, /* height= */ 720);
+    TrackGroup trackGroup = new TrackGroup(format1, format2, format3);
+
+    FakeMediaChunk chunk1 =
+        new FakeMediaChunk(format2, /* startTimeUs= */ 0, /* endTimeUs= */ 10_000_000);
+    FakeMediaChunk chunk2 =
+        new FakeMediaChunk(format2, /* startTimeUs= */ 10_000_000, /* endTimeUs= */ 20_000_000);
+    FakeMediaChunk chunk3 =
+        new FakeMediaChunk(format2, /* startTimeUs= */ 20_000_000, /* endTimeUs= */ 30_000_000);
+    FakeMediaChunk chunk4 =
+        new FakeMediaChunk(format2, /* startTimeUs= */ 30_000_000, /* endTimeUs= */ 40_000_000);
+    FakeMediaChunk chunk5 =
+        new FakeMediaChunk(format1, /* startTimeUs= */ 40_000_000, /* endTimeUs= */ 50_000_000);
+
+    List<FakeMediaChunk> queue = ImmutableList.of(chunk1, chunk2, chunk3, chunk4, chunk5);
+
+    when(mockBandwidthMeter.getBitrateEstimate()).thenReturn(500L);
+    AdaptiveTrackSelection adaptiveTrackSelection =
+        prepareAdaptiveTrackSelectionWithMaxResolutionToDiscard(
+            trackGroup, /* maxWidthToDiscard= */ 320, /* maxHeightToDiscard= */ 240);
+
+    int initialQueueSize =
+        adaptiveTrackSelection.evaluateQueueSize(/* playbackPositionUs= */ 0, queue);
+    assertThat(initialQueueSize).isEqualTo(5);
+
+    fakeClock.advanceTime(2000);
+    when(mockBandwidthMeter.getBitrateEstimate()).thenReturn(2000L);
+
+    // When bandwidth estimation is updated and time has advanced enough, we can discard chunks at
+    // the end of the queue now.
+    // In this case, only chunks less than or equal to width = 320 and height = 240 are discarded.
+    int newSize = adaptiveTrackSelection.evaluateQueueSize(/* playbackPositionUs= */ 0, queue);
+    assertThat(newSize).isEqualTo(4);
+  }
+
+  @Test
   public void updateSelectedTrack_usesFormatOfLastChunkInTheQueueForSelection() {
     Format format1 = videoFormat(/* bitrate= */ 500, /* width= */ 320, /* height= */ 240);
     Format format2 = videoFormat(/* bitrate= */ 1000, /* width= */ 640, /* height= */ 480);
@@ -315,8 +402,9 @@ public final class AdaptiveTrackSelectionTest {
                 /* bandwidthFraction= */ 1f)
             .createAdaptiveTrackSelection(
                 trackGroup,
-                mockBandwidthMeter,
                 /* tracks= */ new int[] {0, 1},
+                /* type= */ TrackSelection.TYPE_UNSET,
+                mockBandwidthMeter,
                 /* adaptationCheckpoints= */ ImmutableList.of());
 
     // Make initial selection.
@@ -343,7 +431,7 @@ public final class AdaptiveTrackSelectionTest {
         /* bufferedDurationUs= */ 4_000_000,
         /* availableDurationUs= */ C.TIME_UNSET,
         queue,
-        /* mediaChunkIterators= */ THREE_EMPTY_MEDIA_CHUNK_ITERATORS);
+        createMediaChunkIterators(trackGroup, TEST_CHUNK_DURATION_US));
 
     assertThat(adaptiveTrackSelection.getSelectedFormat()).isEqualTo(format1);
     assertThat(adaptiveTrackSelection.getSelectionReason()).isEqualTo(C.SELECTION_REASON_ADAPTIVE);
@@ -357,7 +445,7 @@ public final class AdaptiveTrackSelectionTest {
         /* bufferedDurationUs= */ 4_000_000,
         /* availableDurationUs= */ C.TIME_UNSET,
         queue,
-        /* mediaChunkIterators= */ THREE_EMPTY_MEDIA_CHUNK_ITERATORS);
+        createMediaChunkIterators(trackGroup, TEST_CHUNK_DURATION_US));
 
     assertThat(adaptiveTrackSelection.getSelectedFormat()).isEqualTo(format2);
     assertThat(adaptiveTrackSelection.getSelectionReason()).isEqualTo(C.SELECTION_REASON_INITIAL);
@@ -369,7 +457,7 @@ public final class AdaptiveTrackSelectionTest {
     Format format2 = videoFormat(/* bitrate= */ 1000, /* width= */ 640, /* height= */ 480);
     TrackGroup trackGroup = new TrackGroup(format1, format2);
     AdaptiveTrackSelection adaptiveTrackSelection =
-        prepareTrackSelection(adaptiveTrackSelection(trackGroup));
+        prepareTrackSelection(prepareAdaptiveTrackSelection(trackGroup));
     Format unknownFormat = videoFormat(/* bitrate= */ 42, /* width= */ 300, /* height= */ 123);
     FakeMediaChunk chunk =
         new FakeMediaChunk(unknownFormat, /* startTimeUs= */ 0, /* endTimeUs= */ 2_000_000);
@@ -380,7 +468,7 @@ public final class AdaptiveTrackSelectionTest {
         /* bufferedDurationUs= */ 2_000_000,
         /* availableDurationUs= */ C.TIME_UNSET,
         queue,
-        /* mediaChunkIterators= */ THREE_EMPTY_MEDIA_CHUNK_ITERATORS);
+        createMediaChunkIterators(trackGroup, TEST_CHUNK_DURATION_US));
 
     assertThat(adaptiveTrackSelection.getSelectedFormat()).isAnyOf(format1, format2);
   }
@@ -403,7 +491,7 @@ public final class AdaptiveTrackSelectionTest {
             new AdaptationCheckpoint(/* totalBandwidth= */ 5000, /* allocatedBandwidth= */ 1300));
     AdaptiveTrackSelection adaptiveTrackSelection =
         prepareTrackSelection(
-            adaptiveTrackSelectionWithAdaptationCheckpoints(trackGroup, checkpoints));
+            prepareAdaptiveTrackSelectionWithAdaptationCheckpoints(trackGroup, checkpoints));
 
     // Ensure format0 is selected initially so that we can assert the upswitches.
     when(mockBandwidthMeter.getBitrateEstimate()).thenReturn(1L);
@@ -412,7 +500,7 @@ public final class AdaptiveTrackSelectionTest {
         /* bufferedDurationUs= */ 999_999_999_999L,
         /* availableDurationUs= */ C.TIME_UNSET,
         /* queue= */ ImmutableList.of(),
-        /* mediaChunkIterators= */ THREE_EMPTY_MEDIA_CHUNK_ITERATORS);
+        createMediaChunkIterators(trackGroup, TEST_CHUNK_DURATION_US));
     assertThat(adaptiveTrackSelection.getSelectedFormat()).isEqualTo(format0);
 
     when(mockBandwidthMeter.getBitrateEstimate()).thenReturn(999L);
@@ -421,7 +509,7 @@ public final class AdaptiveTrackSelectionTest {
         /* bufferedDurationUs= */ 999_999_999_999L,
         /* availableDurationUs= */ C.TIME_UNSET,
         /* queue= */ ImmutableList.of(),
-        /* mediaChunkIterators= */ THREE_EMPTY_MEDIA_CHUNK_ITERATORS);
+        createMediaChunkIterators(trackGroup, TEST_CHUNK_DURATION_US));
     assertThat(adaptiveTrackSelection.getSelectedFormat()).isEqualTo(format0);
 
     when(mockBandwidthMeter.getBitrateEstimate()).thenReturn(1000L);
@@ -430,7 +518,7 @@ public final class AdaptiveTrackSelectionTest {
         /* bufferedDurationUs= */ 999_999_999_999L,
         /* availableDurationUs= */ C.TIME_UNSET,
         /* queue= */ ImmutableList.of(),
-        /* mediaChunkIterators= */ THREE_EMPTY_MEDIA_CHUNK_ITERATORS);
+        createMediaChunkIterators(trackGroup, TEST_CHUNK_DURATION_US));
     assertThat(adaptiveTrackSelection.getSelectedFormat()).isEqualTo(format1);
 
     when(mockBandwidthMeter.getBitrateEstimate()).thenReturn(2499L);
@@ -439,7 +527,7 @@ public final class AdaptiveTrackSelectionTest {
         /* bufferedDurationUs= */ 999_999_999_999L,
         /* availableDurationUs= */ C.TIME_UNSET,
         /* queue= */ ImmutableList.of(),
-        /* mediaChunkIterators= */ THREE_EMPTY_MEDIA_CHUNK_ITERATORS);
+        createMediaChunkIterators(trackGroup, TEST_CHUNK_DURATION_US));
     assertThat(adaptiveTrackSelection.getSelectedFormat()).isEqualTo(format1);
 
     when(mockBandwidthMeter.getBitrateEstimate()).thenReturn(3500L);
@@ -448,7 +536,7 @@ public final class AdaptiveTrackSelectionTest {
         /* bufferedDurationUs= */ 999_999_999_999L,
         /* availableDurationUs= */ C.TIME_UNSET,
         /* queue= */ ImmutableList.of(),
-        /* mediaChunkIterators= */ THREE_EMPTY_MEDIA_CHUNK_ITERATORS);
+        createMediaChunkIterators(trackGroup, TEST_CHUNK_DURATION_US));
     assertThat(adaptiveTrackSelection.getSelectedFormat()).isEqualTo(format2);
 
     when(mockBandwidthMeter.getBitrateEstimate()).thenReturn(8999L);
@@ -457,7 +545,7 @@ public final class AdaptiveTrackSelectionTest {
         /* bufferedDurationUs= */ 999_999_999_999L,
         /* availableDurationUs= */ C.TIME_UNSET,
         /* queue= */ ImmutableList.of(),
-        /* mediaChunkIterators= */ THREE_EMPTY_MEDIA_CHUNK_ITERATORS);
+        createMediaChunkIterators(trackGroup, TEST_CHUNK_DURATION_US));
     assertThat(adaptiveTrackSelection.getSelectedFormat()).isEqualTo(format2);
 
     when(mockBandwidthMeter.getBitrateEstimate()).thenReturn(9000L);
@@ -466,7 +554,7 @@ public final class AdaptiveTrackSelectionTest {
         /* bufferedDurationUs= */ 999_999_999_999L,
         /* availableDurationUs= */ C.TIME_UNSET,
         /* queue= */ ImmutableList.of(),
-        /* mediaChunkIterators= */ THREE_EMPTY_MEDIA_CHUNK_ITERATORS);
+        createMediaChunkIterators(trackGroup, TEST_CHUNK_DURATION_US));
     assertThat(adaptiveTrackSelection.getSelectedFormat()).isEqualTo(format3);
   }
 
@@ -491,12 +579,13 @@ public final class AdaptiveTrackSelectionTest {
           @Override
           protected AdaptiveTrackSelection createAdaptiveTrackSelection(
               TrackGroup group,
-              BandwidthMeter bandwidthMeter,
               int[] tracks,
+              int type,
+              BandwidthMeter bandwidthMeter,
               ImmutableList<AdaptationCheckpoint> adaptationCheckpoints) {
             checkPoints.add(adaptationCheckpoints);
             return super.createAdaptiveTrackSelection(
-                group, bandwidthMeter, tracks, adaptationCheckpoints);
+                group, tracks, TrackSelection.TYPE_UNSET, bandwidthMeter, adaptationCheckpoints);
           }
         };
 
@@ -541,12 +630,13 @@ public final class AdaptiveTrackSelectionTest {
           @Override
           protected AdaptiveTrackSelection createAdaptiveTrackSelection(
               TrackGroup group,
-              BandwidthMeter bandwidthMeter,
               int[] tracks,
+              int type,
+              BandwidthMeter bandwidthMeter,
               ImmutableList<AdaptationCheckpoint> adaptationCheckpoints) {
             checkPoints.add(adaptationCheckpoints);
             return super.createAdaptiveTrackSelection(
-                group, bandwidthMeter, tracks, adaptationCheckpoints);
+                group, tracks, TrackSelection.TYPE_UNSET, bandwidthMeter, adaptationCheckpoints);
           }
         };
 
@@ -578,69 +668,142 @@ public final class AdaptiveTrackSelectionTest {
         .inOrder();
   }
 
-  private AdaptiveTrackSelection adaptiveTrackSelection(TrackGroup trackGroup) {
-    return adaptiveTrackSelectionWithMinDurationForQualityIncreaseMs(
+  private AdaptiveTrackSelection prepareAdaptiveTrackSelection(TrackGroup trackGroup) {
+    return prepareAdaptiveTrackSelectionWithMinDurationForQualityIncreaseMs(
         trackGroup, AdaptiveTrackSelection.DEFAULT_MIN_DURATION_FOR_QUALITY_INCREASE_MS);
   }
 
-  private AdaptiveTrackSelection adaptiveTrackSelectionWithMinDurationForQualityIncreaseMs(
+  private AdaptiveTrackSelection prepareAdaptiveTrackSelectionWithBandwidthFraction(
+      TrackGroup trackGroup, float bandwidthFraction) {
+    return prepareTrackSelection(
+        new AdaptiveTrackSelection(
+            trackGroup,
+            selectedAllTracksInGroup(trackGroup),
+            TrackSelection.TYPE_UNSET,
+            mockBandwidthMeter,
+            AdaptiveTrackSelection.DEFAULT_MIN_DURATION_FOR_QUALITY_INCREASE_MS,
+            AdaptiveTrackSelection.DEFAULT_MAX_DURATION_FOR_QUALITY_DECREASE_MS,
+            AdaptiveTrackSelection.DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS,
+            AdaptiveTrackSelection.DEFAULT_MAX_WIDTH_TO_DISCARD,
+            AdaptiveTrackSelection.DEFAULT_MAX_HEIGHT_TO_DISCARD,
+            bandwidthFraction,
+            AdaptiveTrackSelection.DEFAULT_BUFFERED_FRACTION_TO_LIVE_EDGE_FOR_QUALITY_INCREASE,
+            /* adaptationCheckpoints= */ ImmutableList.of(),
+            fakeClock));
+  }
+
+  private AdaptiveTrackSelection prepareAdaptiveTrackSelectionWithMinDurationForQualityIncreaseMs(
       TrackGroup trackGroup, long minDurationForQualityIncreaseMs) {
     return prepareTrackSelection(
         new AdaptiveTrackSelection(
             trackGroup,
             selectedAllTracksInGroup(trackGroup),
+            TrackSelection.TYPE_UNSET,
             mockBandwidthMeter,
             minDurationForQualityIncreaseMs,
             AdaptiveTrackSelection.DEFAULT_MAX_DURATION_FOR_QUALITY_DECREASE_MS,
             AdaptiveTrackSelection.DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS,
+            AdaptiveTrackSelection.DEFAULT_MAX_WIDTH_TO_DISCARD,
+            AdaptiveTrackSelection.DEFAULT_MAX_HEIGHT_TO_DISCARD,
             /* bandwidthFraction= */ 1.0f,
             AdaptiveTrackSelection.DEFAULT_BUFFERED_FRACTION_TO_LIVE_EDGE_FOR_QUALITY_INCREASE,
             /* adaptationCheckpoints= */ ImmutableList.of(),
             fakeClock));
   }
 
-  private AdaptiveTrackSelection adaptiveTrackSelectionWithMaxDurationForQualityDecreaseMs(
+  private AdaptiveTrackSelection prepareAdaptiveTrackSelectionWithMaxDurationForQualityDecreaseMs(
       TrackGroup trackGroup, long maxDurationForQualityDecreaseMs) {
     return prepareTrackSelection(
         new AdaptiveTrackSelection(
             trackGroup,
             selectedAllTracksInGroup(trackGroup),
+            TrackSelection.TYPE_UNSET,
             mockBandwidthMeter,
             AdaptiveTrackSelection.DEFAULT_MIN_DURATION_FOR_QUALITY_INCREASE_MS,
             maxDurationForQualityDecreaseMs,
             AdaptiveTrackSelection.DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS,
+            AdaptiveTrackSelection.DEFAULT_MAX_WIDTH_TO_DISCARD,
+            AdaptiveTrackSelection.DEFAULT_MAX_HEIGHT_TO_DISCARD,
             /* bandwidthFraction= */ 1.0f,
             AdaptiveTrackSelection.DEFAULT_BUFFERED_FRACTION_TO_LIVE_EDGE_FOR_QUALITY_INCREASE,
             /* adaptationCheckpoints= */ ImmutableList.of(),
             fakeClock));
   }
 
-  private AdaptiveTrackSelection adaptiveTrackSelectionWithMinTimeBetweenBufferReevaluationMs(
-      TrackGroup trackGroup, long durationToRetainAfterDiscardMs) {
+  private AdaptiveTrackSelection
+      prepareAdaptiveTrackSelectionWithMinTimeBetweenBufferReevaluationMs(
+          TrackGroup trackGroup, long durationToRetainAfterDiscardMs) {
     return prepareTrackSelection(
         new AdaptiveTrackSelection(
             trackGroup,
             selectedAllTracksInGroup(trackGroup),
+            TrackSelection.TYPE_UNSET,
             mockBandwidthMeter,
             AdaptiveTrackSelection.DEFAULT_MIN_DURATION_FOR_QUALITY_INCREASE_MS,
             AdaptiveTrackSelection.DEFAULT_MAX_DURATION_FOR_QUALITY_DECREASE_MS,
             durationToRetainAfterDiscardMs,
+            AdaptiveTrackSelection.DEFAULT_MAX_WIDTH_TO_DISCARD,
+            AdaptiveTrackSelection.DEFAULT_MAX_HEIGHT_TO_DISCARD,
             /* bandwidthFraction= */ 1.0f,
             AdaptiveTrackSelection.DEFAULT_BUFFERED_FRACTION_TO_LIVE_EDGE_FOR_QUALITY_INCREASE,
             /* adaptationCheckpoints= */ ImmutableList.of(),
             fakeClock));
   }
 
-  private AdaptiveTrackSelection adaptiveTrackSelectionWithAdaptationCheckpoints(
+  private AdaptiveTrackSelection prepareAdaptiveTrackSelectionWithMaxResolutionToDiscard(
+      TrackGroup trackGroup, int maxWidthToDiscard, int maxHeightToDiscard) {
+    return prepareTrackSelection(
+        new AdaptiveTrackSelection(
+            trackGroup,
+            selectedAllTracksInGroup(trackGroup),
+            TrackSelection.TYPE_UNSET,
+            mockBandwidthMeter,
+            AdaptiveTrackSelection.DEFAULT_MIN_DURATION_FOR_QUALITY_INCREASE_MS,
+            AdaptiveTrackSelection.DEFAULT_MAX_DURATION_FOR_QUALITY_DECREASE_MS,
+            AdaptiveTrackSelection.DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS,
+            maxWidthToDiscard,
+            maxHeightToDiscard,
+            /* bandwidthFraction= */ 1.0f,
+            AdaptiveTrackSelection.DEFAULT_BUFFERED_FRACTION_TO_LIVE_EDGE_FOR_QUALITY_INCREASE,
+            /* adaptationCheckpoints= */ ImmutableList.of(),
+            fakeClock));
+  }
+
+  private AdaptiveTrackSelection
+      prepareAdaptiveTrackSelectionWithBufferedFractionToLiveEdgeForQualiyIncrease(
+          TrackGroup trackGroup,
+          float bufferedFractionToLiveEdgeForQualityIncrease,
+          long minDurationForQualityIncreaseMs) {
+    return prepareTrackSelection(
+        new AdaptiveTrackSelection(
+            trackGroup,
+            selectedAllTracksInGroup(trackGroup),
+            TrackSelection.TYPE_UNSET,
+            mockBandwidthMeter,
+            minDurationForQualityIncreaseMs,
+            AdaptiveTrackSelection.DEFAULT_MAX_DURATION_FOR_QUALITY_DECREASE_MS,
+            AdaptiveTrackSelection.DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS,
+            AdaptiveTrackSelection.DEFAULT_MAX_WIDTH_TO_DISCARD,
+            AdaptiveTrackSelection.DEFAULT_MAX_HEIGHT_TO_DISCARD,
+            /* bandwidthFraction= */ 1.0f,
+            bufferedFractionToLiveEdgeForQualityIncrease,
+            /* adaptationCheckpoints= */ ImmutableList.of(),
+            fakeClock));
+  }
+
+  private AdaptiveTrackSelection prepareAdaptiveTrackSelectionWithAdaptationCheckpoints(
       TrackGroup trackGroup, List<AdaptationCheckpoint> adaptationCheckpoints) {
     return prepareTrackSelection(
         new AdaptiveTrackSelection(
             trackGroup,
             selectedAllTracksInGroup(trackGroup),
+            TrackSelection.TYPE_UNSET,
             mockBandwidthMeter,
             AdaptiveTrackSelection.DEFAULT_MIN_DURATION_FOR_QUALITY_INCREASE_MS,
             AdaptiveTrackSelection.DEFAULT_MAX_DURATION_FOR_QUALITY_DECREASE_MS,
             AdaptiveTrackSelection.DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS,
+            AdaptiveTrackSelection.DEFAULT_MAX_WIDTH_TO_DISCARD,
+            AdaptiveTrackSelection.DEFAULT_MAX_HEIGHT_TO_DISCARD,
             /* bandwidthFraction= */ 1.0f,
             AdaptiveTrackSelection.DEFAULT_BUFFERED_FRACTION_TO_LIVE_EDGE_FOR_QUALITY_INCREASE,
             adaptationCheckpoints,
@@ -655,8 +818,33 @@ public final class AdaptiveTrackSelectionTest {
         /* bufferedDurationUs= */ 0,
         /* availableDurationUs= */ C.TIME_UNSET,
         /* queue= */ Collections.emptyList(),
-        /* mediaChunkIterators= */ THREE_EMPTY_MEDIA_CHUNK_ITERATORS);
+        createMediaChunkIterators(adaptiveTrackSelection.getTrackGroup(), TEST_CHUNK_DURATION_US));
     return adaptiveTrackSelection;
+  }
+
+  private MediaChunkIterator[] createMediaChunkIterators(
+      TrackGroup trackGroup, long chunkDurationUs) {
+    MediaChunkIterator[] iterators = new MediaChunkIterator[trackGroup.length];
+    for (int i = 0; i < trackGroup.length; i++) {
+      iterators[i] =
+          new BaseMediaChunkIterator(/* fromIndex= */ 0, /* toIndex= */ 0) {
+            @Override
+            public DataSpec getDataSpec() {
+              return new DataSpec.Builder().setUri("https://test.example").build();
+            }
+
+            @Override
+            public long getChunkStartTimeUs() {
+              return 123_456_789;
+            }
+
+            @Override
+            public long getChunkEndTimeUs() {
+              return 123_456_789 + chunkDurationUs;
+            }
+          };
+    }
+    return iterators;
   }
 
   private int[] selectedAllTracksInGroup(TrackGroup trackGroup) {

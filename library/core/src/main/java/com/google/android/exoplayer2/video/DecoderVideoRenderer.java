@@ -18,7 +18,9 @@ package com.google.android.exoplayer2.video;
 import static com.google.android.exoplayer2.decoder.DecoderReuseEvaluation.DISCARD_REASON_DRM_SESSION_CHANGED;
 import static com.google.android.exoplayer2.decoder.DecoderReuseEvaluation.DISCARD_REASON_REUSE_NOT_IMPLEMENTED;
 import static com.google.android.exoplayer2.decoder.DecoderReuseEvaluation.REUSE_RESULT_NO;
+import static com.google.android.exoplayer2.source.SampleStream.FLAG_REQUIRE_FORMAT;
 import static java.lang.Math.max;
+import static java.lang.annotation.ElementType.TYPE_USE;
 
 import android.os.Handler;
 import android.os.SystemClock;
@@ -28,40 +30,44 @@ import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.BaseRenderer;
 import com.google.android.exoplayer2.C;
+import com.google.android.exoplayer2.C.VideoOutputMode;
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.FormatHolder;
-import com.google.android.exoplayer2.PlayerMessage.Target;
+import com.google.android.exoplayer2.PlaybackException;
+import com.google.android.exoplayer2.PlayerMessage;
+import com.google.android.exoplayer2.decoder.CryptoConfig;
 import com.google.android.exoplayer2.decoder.Decoder;
 import com.google.android.exoplayer2.decoder.DecoderCounters;
 import com.google.android.exoplayer2.decoder.DecoderException;
 import com.google.android.exoplayer2.decoder.DecoderInputBuffer;
 import com.google.android.exoplayer2.decoder.DecoderReuseEvaluation;
+import com.google.android.exoplayer2.decoder.VideoDecoderOutputBuffer;
 import com.google.android.exoplayer2.drm.DrmSession;
 import com.google.android.exoplayer2.drm.DrmSession.DrmSessionException;
-import com.google.android.exoplayer2.drm.ExoMediaCrypto;
-import com.google.android.exoplayer2.source.SampleStream;
+import com.google.android.exoplayer2.source.SampleStream.ReadDataResult;
 import com.google.android.exoplayer2.util.Assertions;
+import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.TimedValueQueue;
 import com.google.android.exoplayer2.util.TraceUtil;
+import com.google.android.exoplayer2.util.Util;
 import com.google.android.exoplayer2.video.VideoRendererEventListener.EventDispatcher;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
  * Decodes and renders video using a {@link Decoder}.
  *
- * <p>This renderer accepts the following messages sent via {@link ExoPlayer#createMessage(Target)}
- * on the playback thread:
+ * <p>This renderer accepts the following messages sent via {@link
+ * ExoPlayer#createMessage(PlayerMessage.Target)} on the playback thread:
  *
  * <ul>
- *   <li>Message with type {@link #MSG_SET_SURFACE} to set the output surface. The message payload
- *       should be the target {@link Surface}, or null.
- *   <li>Message with type {@link #MSG_SET_VIDEO_DECODER_OUTPUT_BUFFER_RENDERER} to set the output
- *       buffer renderer. The message payload should be the target {@link
- *       VideoDecoderOutputBufferRenderer}, or null.
+ *   <li>Message with type {@link #MSG_SET_VIDEO_OUTPUT} to set the output surface. The message
+ *       payload should be the target {@link Surface} or {@link VideoDecoderOutputBufferRenderer},
+ *       or null. Other non-null payloads have the effect of clearing the output.
  *   <li>Message with type {@link #MSG_SET_VIDEO_FRAME_METADATA_LISTENER} to set a listener for
  *       metadata associated with frames being rendered. The message payload should be the {@link
  *       VideoFrameMetadataListener}, or null.
@@ -69,9 +75,12 @@ import java.lang.annotation.RetentionPolicy;
  */
 public abstract class DecoderVideoRenderer extends BaseRenderer {
 
+  private static final String TAG = "DecoderVideoRenderer";
+
   /** Decoder reinitialization states. */
   @Documented
   @Retention(RetentionPolicy.SOURCE)
+  @Target(TYPE_USE)
   @IntDef({
     REINITIALIZATION_STATE_NONE,
     REINITIALIZATION_STATE_SIGNAL_END_OF_STREAM,
@@ -104,20 +113,21 @@ public abstract class DecoderVideoRenderer extends BaseRenderer {
 
   @Nullable
   private Decoder<
-          VideoDecoderInputBuffer, ? extends VideoDecoderOutputBuffer, ? extends DecoderException>
+          DecoderInputBuffer, ? extends VideoDecoderOutputBuffer, ? extends DecoderException>
       decoder;
 
-  private VideoDecoderInputBuffer inputBuffer;
+  private DecoderInputBuffer inputBuffer;
   private VideoDecoderOutputBuffer outputBuffer;
-  @Nullable private Surface surface;
+  private @VideoOutputMode int outputMode;
+  @Nullable private Object output;
+  @Nullable private Surface outputSurface;
   @Nullable private VideoDecoderOutputBufferRenderer outputBufferRenderer;
   @Nullable private VideoFrameMetadataListener frameMetadataListener;
-  @C.VideoOutputMode private int outputMode;
 
   @Nullable private DrmSession decoderDrmSession;
   @Nullable private DrmSession sourceDrmSession;
 
-  @ReinitializationState private int decoderReinitializationState;
+  private @ReinitializationState int decoderReinitializationState;
   private boolean decoderReceivedBuffers;
 
   private boolean renderedFirstFrameAfterReset;
@@ -129,8 +139,7 @@ public abstract class DecoderVideoRenderer extends BaseRenderer {
 
   private boolean inputStreamEnded;
   private boolean outputStreamEnded;
-  private int reportedWidth;
-  private int reportedHeight;
+  @Nullable private VideoSize reportedVideoSize;
 
   private long droppedFrameAccumulationStartTimeMs;
   private int droppedFrames;
@@ -162,7 +171,7 @@ public abstract class DecoderVideoRenderer extends BaseRenderer {
     joiningDeadlineMs = C.TIME_UNSET;
     clearReportedVideoSize();
     formatQueue = new TimedValueQueue<>();
-    flagsOnlyBuffer = DecoderInputBuffer.newFlagsOnlyInstance();
+    flagsOnlyBuffer = DecoderInputBuffer.newNoDataInstance();
     eventDispatcher = new EventDispatcher(eventHandler, eventListener);
     decoderReinitializationState = REINITIALIZATION_STATE_NONE;
     outputMode = C.VIDEO_OUTPUT_MODE_NONE;
@@ -180,7 +189,7 @@ public abstract class DecoderVideoRenderer extends BaseRenderer {
       // We don't have a format yet, so try and read one.
       FormatHolder formatHolder = getFormatHolder();
       flagsOnlyBuffer.clear();
-      @SampleStream.ReadDataResult int result = readSource(formatHolder, flagsOnlyBuffer, true);
+      @ReadDataResult int result = readSource(formatHolder, flagsOnlyBuffer, FLAG_REQUIRE_FORMAT);
       if (result == C.RESULT_FORMAT_READ) {
         onInputFormatChanged(formatHolder);
       } else if (result == C.RESULT_BUFFER_READ) {
@@ -206,7 +215,9 @@ public abstract class DecoderVideoRenderer extends BaseRenderer {
         while (feedInputBuffer()) {}
         TraceUtil.endSection();
       } catch (DecoderException e) {
-        throw createRendererException(e, inputFormat);
+        Log.e(TAG, "Video codec error", e);
+        eventDispatcher.videoCodecError(e);
+        throw createRendererException(e, inputFormat, PlaybackException.ERROR_CODE_DECODING_FAILED);
       }
       decoderCounters.ensureUpdated();
     }
@@ -241,11 +252,10 @@ public abstract class DecoderVideoRenderer extends BaseRenderer {
   // PlayerMessage.Target implementation.
 
   @Override
-  public void handleMessage(int messageType, @Nullable Object message) throws ExoPlaybackException {
-    if (messageType == MSG_SET_SURFACE) {
-      setOutputSurface((Surface) message);
-    } else if (messageType == MSG_SET_VIDEO_DECODER_OUTPUT_BUFFER_RENDERER) {
-      setOutputBufferRenderer((VideoDecoderOutputBufferRenderer) message);
+  public void handleMessage(@MessageType int messageType, @Nullable Object message)
+      throws ExoPlaybackException {
+    if (messageType == MSG_SET_VIDEO_OUTPUT) {
+      setOutput(message);
     } else if (messageType == MSG_SET_VIDEO_FRAME_METADATA_LISTENER) {
       frameMetadataListener = (VideoFrameMetadataListener) message;
     } else {
@@ -410,7 +420,7 @@ public abstract class DecoderVideoRenderer extends BaseRenderer {
    *
    * @param buffer The buffer that will be queued.
    */
-  protected void onQueueInputBuffer(VideoDecoderInputBuffer buffer) {
+  protected void onQueueInputBuffer(DecoderInputBuffer buffer) {
     // Do nothing.
   }
 
@@ -478,7 +488,8 @@ public abstract class DecoderVideoRenderer extends BaseRenderer {
    * @param outputBuffer The output buffer to drop.
    */
   protected void dropOutputBuffer(VideoDecoderOutputBuffer outputBuffer) {
-    updateDroppedBufferCounters(1);
+    updateDroppedBufferCounters(
+        /* droppedInputBufferCount= */ 0, /* droppedDecoderBufferCount= */ 1);
     outputBuffer.release();
   }
 
@@ -499,21 +510,27 @@ public abstract class DecoderVideoRenderer extends BaseRenderer {
     decoderCounters.droppedToKeyframeCount++;
     // We dropped some buffers to catch up, so update the decoder counters and flush the decoder,
     // which releases all pending buffers buffers including the current output buffer.
-    updateDroppedBufferCounters(buffersInCodecCount + droppedSourceBufferCount);
+    updateDroppedBufferCounters(
+        droppedSourceBufferCount, /* droppedDecoderBufferCount= */ buffersInCodecCount);
     flushDecoder();
     return true;
   }
 
   /**
-   * Updates decoder counters to reflect that {@code droppedBufferCount} additional buffers were
-   * dropped.
+   * Updates local counters and {@link #decoderCounters} to reflect that buffers were dropped.
    *
-   * @param droppedBufferCount The number of additional dropped buffers.
+   * @param droppedInputBufferCount The number of buffers dropped from the source before being
+   *     passed to the decoder.
+   * @param droppedDecoderBufferCount The number of buffers dropped after being passed to the
+   *     decoder.
    */
-  protected void updateDroppedBufferCounters(int droppedBufferCount) {
-    decoderCounters.droppedBufferCount += droppedBufferCount;
-    droppedFrames += droppedBufferCount;
-    consecutiveDroppedFrameCount += droppedBufferCount;
+  protected void updateDroppedBufferCounters(
+      int droppedInputBufferCount, int droppedDecoderBufferCount) {
+    decoderCounters.droppedInputBufferCount += droppedInputBufferCount;
+    int totalDroppedBufferCount = droppedInputBufferCount + droppedDecoderBufferCount;
+    decoderCounters.droppedBufferCount += totalDroppedBufferCount;
+    droppedFrames += totalDroppedBufferCount;
+    consecutiveDroppedFrameCount += totalDroppedBufferCount;
     decoderCounters.maxConsecutiveDroppedBufferCount =
         max(consecutiveDroppedFrameCount, decoderCounters.maxConsecutiveDroppedBufferCount);
     if (maxDroppedFramesToNotify > 0 && droppedFrames >= maxDroppedFramesToNotify) {
@@ -525,14 +542,14 @@ public abstract class DecoderVideoRenderer extends BaseRenderer {
    * Creates a decoder for the given format.
    *
    * @param format The format for which a decoder is required.
-   * @param mediaCrypto The {@link ExoMediaCrypto} object required for decoding encrypted content.
+   * @param cryptoConfig The {@link CryptoConfig} object required for decoding encrypted content.
    *     May be null and can be ignored if decoder does not handle encrypted content.
    * @return The decoder.
    * @throws DecoderException If an error occurred creating a suitable decoder.
    */
   protected abstract Decoder<
-          VideoDecoderInputBuffer, ? extends VideoDecoderOutputBuffer, ? extends DecoderException>
-      createDecoder(Format format, @Nullable ExoMediaCrypto mediaCrypto) throws DecoderException;
+          DecoderInputBuffer, ? extends VideoDecoderOutputBuffer, ? extends DecoderException>
+      createDecoder(Format format, @Nullable CryptoConfig cryptoConfig) throws DecoderException;
 
   /**
    * Renders the specified output buffer.
@@ -552,9 +569,9 @@ public abstract class DecoderVideoRenderer extends BaseRenderer {
       frameMetadataListener.onVideoFrameAboutToBeRendered(
           presentationTimeUs, System.nanoTime(), outputFormat, /* mediaFormat= */ null);
     }
-    lastRenderTimeUs = C.msToUs(SystemClock.elapsedRealtime() * 1000);
+    lastRenderTimeUs = Util.msToUs(SystemClock.elapsedRealtime() * 1000);
     int bufferMode = outputBuffer.mode;
-    boolean renderSurface = bufferMode == C.VIDEO_OUTPUT_MODE_SURFACE_YUV && surface != null;
+    boolean renderSurface = bufferMode == C.VIDEO_OUTPUT_MODE_SURFACE_YUV && outputSurface != null;
     boolean renderYuv = bufferMode == C.VIDEO_OUTPUT_MODE_YUV && outputBufferRenderer != null;
     if (!renderYuv && !renderSurface) {
       dropOutputBuffer(outputBuffer);
@@ -563,7 +580,7 @@ public abstract class DecoderVideoRenderer extends BaseRenderer {
       if (renderYuv) {
         outputBufferRenderer.setOutputBuffer(outputBuffer);
       } else {
-        renderOutputBufferToSurface(outputBuffer, surface);
+        renderOutputBufferToSurface(outputBuffer, outputSurface);
       }
       consecutiveDroppedFrameCount = 0;
       decoderCounters.renderedOutputBufferCount++;
@@ -584,47 +601,26 @@ public abstract class DecoderVideoRenderer extends BaseRenderer {
   protected abstract void renderOutputBufferToSurface(
       VideoDecoderOutputBuffer outputBuffer, Surface surface) throws DecoderException;
 
-  /**
-   * Sets output surface.
-   *
-   * @param surface Surface.
-   */
-  protected final void setOutputSurface(@Nullable Surface surface) {
-    if (this.surface != surface) {
-      // The output has changed.
-      this.surface = surface;
-      if (surface != null) {
-        outputBufferRenderer = null;
-        outputMode = C.VIDEO_OUTPUT_MODE_SURFACE_YUV;
-        if (decoder != null) {
-          setDecoderOutputMode(outputMode);
-        }
-        onOutputChanged();
-      } else {
-        // The output has been removed. We leave the outputMode of the underlying decoder unchanged
-        // in anticipation that a subsequent output will likely be of the same type.
-        outputMode = C.VIDEO_OUTPUT_MODE_NONE;
-        onOutputRemoved();
-      }
-    } else if (surface != null) {
-      // The output is unchanged and non-null.
-      onOutputReset();
+  /** Sets the video output. */
+  protected final void setOutput(@Nullable Object output) {
+    if (output instanceof Surface) {
+      outputSurface = (Surface) output;
+      outputBufferRenderer = null;
+      outputMode = C.VIDEO_OUTPUT_MODE_SURFACE_YUV;
+    } else if (output instanceof VideoDecoderOutputBufferRenderer) {
+      outputSurface = null;
+      outputBufferRenderer = (VideoDecoderOutputBufferRenderer) output;
+      outputMode = C.VIDEO_OUTPUT_MODE_YUV;
+    } else {
+      // Handle unsupported outputs by clearing the output.
+      output = null;
+      outputSurface = null;
+      outputBufferRenderer = null;
+      outputMode = C.VIDEO_OUTPUT_MODE_NONE;
     }
-  }
-
-  /**
-   * Sets output buffer renderer.
-   *
-   * @param outputBufferRenderer Output buffer renderer.
-   */
-  protected final void setOutputBufferRenderer(
-      @Nullable VideoDecoderOutputBufferRenderer outputBufferRenderer) {
-    if (this.outputBufferRenderer != outputBufferRenderer) {
-      // The output has changed.
-      this.outputBufferRenderer = outputBufferRenderer;
-      if (outputBufferRenderer != null) {
-        surface = null;
-        outputMode = C.VIDEO_OUTPUT_MODE_YUV;
+    if (this.output != output) {
+      this.output = output;
+      if (output != null) {
         if (decoder != null) {
           setDecoderOutputMode(outputMode);
         }
@@ -632,10 +628,9 @@ public abstract class DecoderVideoRenderer extends BaseRenderer {
       } else {
         // The output has been removed. We leave the outputMode of the underlying decoder unchanged
         // in anticipation that a subsequent output will likely be of the same type.
-        outputMode = C.VIDEO_OUTPUT_MODE_NONE;
         onOutputRemoved();
       }
-    } else if (outputBufferRenderer != null) {
+    } else if (output != null) {
       // The output is unchanged and non-null.
       onOutputReset();
     }
@@ -646,7 +641,7 @@ public abstract class DecoderVideoRenderer extends BaseRenderer {
    *
    * @param outputMode Output mode.
    */
-  protected abstract void setDecoderOutputMode(@C.VideoOutputMode int outputMode);
+  protected abstract void setDecoderOutputMode(@VideoOutputMode int outputMode);
 
   /**
    * Evaluates whether the existing decoder can be reused for a new {@link Format}.
@@ -682,10 +677,10 @@ public abstract class DecoderVideoRenderer extends BaseRenderer {
 
     setDecoderDrmSession(sourceDrmSession);
 
-    ExoMediaCrypto mediaCrypto = null;
+    CryptoConfig cryptoConfig = null;
     if (decoderDrmSession != null) {
-      mediaCrypto = decoderDrmSession.getMediaCrypto();
-      if (mediaCrypto == null) {
+      cryptoConfig = decoderDrmSession.getCryptoConfig();
+      if (cryptoConfig == null) {
         DrmSessionException drmError = decoderDrmSession.getError();
         if (drmError != null) {
           // Continue for now. We may be able to avoid failure if a new input format causes the
@@ -699,7 +694,7 @@ public abstract class DecoderVideoRenderer extends BaseRenderer {
 
     try {
       long decoderInitializingTimestamp = SystemClock.elapsedRealtime();
-      decoder = createDecoder(inputFormat, mediaCrypto);
+      decoder = createDecoder(inputFormat, cryptoConfig);
       setDecoderOutputMode(outputMode);
       long decoderInitializedTimestamp = SystemClock.elapsedRealtime();
       eventDispatcher.decoderInitialized(
@@ -707,8 +702,14 @@ public abstract class DecoderVideoRenderer extends BaseRenderer {
           decoderInitializedTimestamp,
           decoderInitializedTimestamp - decoderInitializingTimestamp);
       decoderCounters.decoderInitCount++;
-    } catch (DecoderException | OutOfMemoryError e) {
-      throw createRendererException(e, inputFormat);
+    } catch (DecoderException e) {
+      Log.e(TAG, "Video codec error", e);
+      eventDispatcher.videoCodecError(e);
+      throw createRendererException(
+          e, inputFormat, PlaybackException.ERROR_CODE_DECODER_INIT_FAILED);
+    } catch (OutOfMemoryError e) {
+      throw createRendererException(
+          e, inputFormat, PlaybackException.ERROR_CODE_DECODER_INIT_FAILED);
     }
   }
 
@@ -736,7 +737,7 @@ public abstract class DecoderVideoRenderer extends BaseRenderer {
     }
 
     FormatHolder formatHolder = getFormatHolder();
-    switch (readSource(formatHolder, inputBuffer, /* formatRequired= */ false)) {
+    switch (readSource(formatHolder, inputBuffer, /* readFlags= */ 0)) {
       case C.RESULT_NOTHING_READ:
         return false;
       case C.RESULT_FORMAT_READ:
@@ -759,7 +760,7 @@ public abstract class DecoderVideoRenderer extends BaseRenderer {
         decoder.queueInputBuffer(inputBuffer);
         buffersInCodecCount++;
         decoderReceivedBuffers = true;
-        decoderCounters.inputBufferCount++;
+        decoderCounters.queuedInputBufferCount++;
         inputBuffer = null;
         return true;
       default:
@@ -917,37 +918,32 @@ public abstract class DecoderVideoRenderer extends BaseRenderer {
     renderedFirstFrameAfterEnable = true;
     if (!renderedFirstFrameAfterReset) {
       renderedFirstFrameAfterReset = true;
-      eventDispatcher.renderedFirstFrame(surface);
+      eventDispatcher.renderedFirstFrame(output);
     }
   }
 
   private void maybeRenotifyRenderedFirstFrame() {
     if (renderedFirstFrameAfterReset) {
-      eventDispatcher.renderedFirstFrame(surface);
+      eventDispatcher.renderedFirstFrame(output);
     }
   }
 
   private void clearReportedVideoSize() {
-    reportedWidth = Format.NO_VALUE;
-    reportedHeight = Format.NO_VALUE;
+    reportedVideoSize = null;
   }
 
   private void maybeNotifyVideoSizeChanged(int width, int height) {
-    if (reportedWidth != width || reportedHeight != height) {
-      reportedWidth = width;
-      reportedHeight = height;
-      eventDispatcher.videoSizeChanged(
-          width, height, /* unappliedRotationDegrees= */ 0, /* pixelWidthHeightRatio= */ 1);
+    if (reportedVideoSize == null
+        || reportedVideoSize.width != width
+        || reportedVideoSize.height != height) {
+      reportedVideoSize = new VideoSize(width, height);
+      eventDispatcher.videoSizeChanged(reportedVideoSize);
     }
   }
 
   private void maybeRenotifyVideoSizeChanged() {
-    if (reportedWidth != Format.NO_VALUE || reportedHeight != Format.NO_VALUE) {
-      eventDispatcher.videoSizeChanged(
-          reportedWidth,
-          reportedHeight,
-          /* unappliedRotationDegrees= */ 0,
-          /* pixelWidthHeightRatio= */ 1);
+    if (reportedVideoSize != null) {
+      eventDispatcher.videoSizeChanged(reportedVideoSize);
     }
   }
 

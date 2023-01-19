@@ -17,6 +17,7 @@ package com.google.android.exoplayer2.source.ads;
 
 import static com.google.android.exoplayer2.util.Assertions.checkNotNull;
 import static com.google.android.exoplayer2.util.Assertions.checkState;
+import static java.lang.annotation.ElementType.TYPE_USE;
 
 import android.net.Uri;
 import android.os.Handler;
@@ -35,7 +36,7 @@ import com.google.android.exoplayer2.source.MediaPeriod;
 import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.source.MediaSource.MediaPeriodId;
 import com.google.android.exoplayer2.source.MediaSourceEventListener;
-import com.google.android.exoplayer2.source.MediaSourceFactory;
+import com.google.android.exoplayer2.ui.AdViewProvider;
 import com.google.android.exoplayer2.upstream.Allocator;
 import com.google.android.exoplayer2.upstream.DataSpec;
 import com.google.android.exoplayer2.upstream.TransferListener;
@@ -45,6 +46,7 @@ import java.io.IOException;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -71,6 +73,7 @@ public final class AdsMediaSource extends CompositeMediaSource<MediaPeriodId> {
      */
     @Documented
     @Retention(RetentionPolicy.SOURCE)
+    @Target(TYPE_USE)
     @IntDef({TYPE_AD, TYPE_AD_GROUP, TYPE_ALL_ADS, TYPE_UNEXPECTED})
     public @interface Type {}
     /** Type for when an ad failed to load. The ad will be skipped. */
@@ -126,9 +129,9 @@ public final class AdsMediaSource extends CompositeMediaSource<MediaPeriodId> {
       new MediaPeriodId(/* periodUid= */ new Object());
 
   private final MediaSource contentMediaSource;
-  private final MediaSourceFactory adMediaSourceFactory;
+  private final MediaSource.Factory adMediaSourceFactory;
   private final AdsLoader adsLoader;
-  private final AdsLoader.AdViewProvider adViewProvider;
+  private final AdViewProvider adViewProvider;
   private final DataSpec adTagDataSpec;
   private final Object adsId;
   private final Handler mainHandler;
@@ -158,9 +161,9 @@ public final class AdsMediaSource extends CompositeMediaSource<MediaPeriodId> {
       MediaSource contentMediaSource,
       DataSpec adTagDataSpec,
       Object adsId,
-      MediaSourceFactory adMediaSourceFactory,
+      MediaSource.Factory adMediaSourceFactory,
       AdsLoader adsLoader,
-      AdsLoader.AdViewProvider adViewProvider) {
+      AdViewProvider adViewProvider) {
     this.contentMediaSource = contentMediaSource;
     this.adMediaSourceFactory = adMediaSourceFactory;
     this.adsLoader = adsLoader;
@@ -171,17 +174,6 @@ public final class AdsMediaSource extends CompositeMediaSource<MediaPeriodId> {
     period = new Timeline.Period();
     adMediaSourceHolders = new AdMediaSourceHolder[0][];
     adsLoader.setSupportedContentTypes(adMediaSourceFactory.getSupportedTypes());
-  }
-
-  /**
-   * @deprecated Use {@link #getMediaItem()} and {@link MediaItem.PlaybackProperties#tag} instead.
-   */
-  @SuppressWarnings("deprecation")
-  @Deprecated
-  @Override
-  @Nullable
-  public Object getTag() {
-    return contentMediaSource.getTag();
   }
 
   @Override
@@ -264,25 +256,25 @@ public final class AdsMediaSource extends CompositeMediaSource<MediaPeriodId> {
 
   @Override
   protected void onChildSourceInfoRefreshed(
-      MediaPeriodId mediaPeriodId, MediaSource mediaSource, Timeline timeline) {
-    if (mediaPeriodId.isAd()) {
-      int adGroupIndex = mediaPeriodId.adGroupIndex;
-      int adIndexInAdGroup = mediaPeriodId.adIndexInAdGroup;
+      MediaPeriodId childSourceId, MediaSource mediaSource, Timeline newTimeline) {
+    if (childSourceId.isAd()) {
+      int adGroupIndex = childSourceId.adGroupIndex;
+      int adIndexInAdGroup = childSourceId.adIndexInAdGroup;
       checkNotNull(adMediaSourceHolders[adGroupIndex][adIndexInAdGroup])
-          .handleSourceInfoRefresh(timeline);
+          .handleSourceInfoRefresh(newTimeline);
     } else {
-      Assertions.checkArgument(timeline.getPeriodCount() == 1);
-      contentTimeline = timeline;
+      Assertions.checkArgument(newTimeline.getPeriodCount() == 1);
+      contentTimeline = newTimeline;
     }
     maybeUpdateSourceInfo();
   }
 
   @Override
   protected MediaPeriodId getMediaPeriodIdForChildMediaPeriodId(
-      MediaPeriodId childId, MediaPeriodId mediaPeriodId) {
+      MediaPeriodId childSourceId, MediaPeriodId mediaPeriodId) {
     // The child id for the content period is just CHILD_SOURCE_MEDIA_PERIOD_ID. That's why
     // we need to forward the reported mediaPeriodId in this case.
-    return childId.isAd() ? childId : mediaPeriodId;
+    return childSourceId.isAd() ? childSourceId : mediaPeriodId;
   }
 
   // Internal methods.
@@ -315,32 +307,19 @@ public final class AdsMediaSource extends CompositeMediaSource<MediaPeriodId> {
         @Nullable
         AdMediaSourceHolder adMediaSourceHolder =
             this.adMediaSourceHolders[adGroupIndex][adIndexInAdGroup];
+        AdPlaybackState.AdGroup adGroup = adPlaybackState.getAdGroup(adGroupIndex);
         if (adMediaSourceHolder != null
             && !adMediaSourceHolder.hasMediaSource()
-            && adPlaybackState.adGroups[adGroupIndex] != null
-            && adIndexInAdGroup < adPlaybackState.adGroups[adGroupIndex].uris.length) {
-          @Nullable Uri adUri = adPlaybackState.adGroups[adGroupIndex].uris[adIndexInAdGroup];
+            && adIndexInAdGroup < adGroup.uris.length) {
+          @Nullable Uri adUri = adGroup.uris[adIndexInAdGroup];
           if (adUri != null) {
             MediaItem.Builder adMediaItem = new MediaItem.Builder().setUri(adUri);
             // Propagate the content's DRM config into the ad media source.
             @Nullable
-            MediaItem.PlaybackProperties contentPlaybackProperties =
-                contentMediaSource.getMediaItem().playbackProperties;
-            if (contentPlaybackProperties != null
-                && contentPlaybackProperties.drmConfiguration != null) {
-              MediaItem.DrmConfiguration drmConfiguration =
-                  contentPlaybackProperties.drmConfiguration;
-              // TODO(internal b/179984779): Use MediaItem.Builder#setDrmConfiguration() when it's
-              // available.
-              adMediaItem.setDrmUuid(drmConfiguration.uuid);
-              adMediaItem.setDrmKeySetId(drmConfiguration.getKeySetId());
-              adMediaItem.setDrmLicenseUri(drmConfiguration.licenseUri);
-              adMediaItem.setDrmForceDefaultLicenseUri(drmConfiguration.forceDefaultLicenseUri);
-              adMediaItem.setDrmLicenseRequestHeaders(drmConfiguration.requestHeaders);
-              adMediaItem.setDrmMultiSession(drmConfiguration.multiSession);
-              adMediaItem.setDrmPlayClearContentWithoutKey(
-                  drmConfiguration.playClearContentWithoutKey);
-              adMediaItem.setDrmSessionForClearTypes(drmConfiguration.sessionForClearTypes);
+            MediaItem.LocalConfiguration contentLocalConfiguration =
+                contentMediaSource.getMediaItem().localConfiguration;
+            if (contentLocalConfiguration != null) {
+              adMediaItem.setDrmConfiguration(contentLocalConfiguration.drmConfiguration);
             }
             MediaSource adMediaSource = adMediaSourceFactory.createMediaSource(adMediaItem.build());
             adMediaSourceHolder.initializeWithMediaSource(adMediaSource, adUri);

@@ -15,9 +15,12 @@
  */
 package com.google.android.exoplayer2.audio;
 
+import android.media.AudioDeviceInfo;
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.PlaybackParameters;
+import com.google.android.exoplayer2.analytics.PlayerId;
 import java.nio.ByteBuffer;
 
 /** An overridable {@link AudioSink} implementation forwarding all methods to another sink. */
@@ -35,13 +38,17 @@ public class ForwardingAudioSink implements AudioSink {
   }
 
   @Override
+  public void setPlayerId(@Nullable PlayerId playerId) {
+    sink.setPlayerId(playerId);
+  }
+
+  @Override
   public boolean supportsFormat(Format format) {
     return sink.supportsFormat(format);
   }
 
   @Override
-  @SinkFormatSupport
-  public int getFormatSupport(Format format) {
+  public @SinkFormatSupport int getFormatSupport(Format format) {
     return sink.getFormatSupport(format);
   }
 
@@ -114,6 +121,12 @@ public class ForwardingAudioSink implements AudioSink {
   }
 
   @Override
+  @Nullable
+  public AudioAttributes getAudioAttributes() {
+    return sink.getAudioAttributes();
+  }
+
+  @Override
   public void setAudioSessionId(int audioSessionId) {
     sink.setAudioSessionId(audioSessionId);
   }
@@ -121,6 +134,17 @@ public class ForwardingAudioSink implements AudioSink {
   @Override
   public void setAuxEffectInfo(AuxEffectInfo auxEffectInfo) {
     sink.setAuxEffectInfo(auxEffectInfo);
+  }
+
+  @RequiresApi(23)
+  @Override
+  public void setPreferredDevice(@Nullable AudioDeviceInfo audioDeviceInfo) {
+    sink.setPreferredDevice(audioDeviceInfo);
+  }
+
+  @Override
+  public void setOutputStreamOffsetUs(long outputStreamOffsetUs) {
+    sink.setOutputStreamOffsetUs(outputStreamOffsetUs);
   }
 
   @Override

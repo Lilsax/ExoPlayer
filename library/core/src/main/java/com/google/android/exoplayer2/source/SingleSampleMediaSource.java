@@ -16,7 +16,7 @@
 package com.google.android.exoplayer2.source;
 
 import static com.google.android.exoplayer2.util.Assertions.checkNotNull;
-import static com.google.android.exoplayer2.util.Util.castNonNull;
+import static com.google.common.base.MoreObjects.firstNonNull;
 
 import android.net.Uri;
 import androidx.annotation.Nullable;
@@ -29,7 +29,9 @@ import com.google.android.exoplayer2.upstream.DataSpec;
 import com.google.android.exoplayer2.upstream.DefaultLoadErrorHandlingPolicy;
 import com.google.android.exoplayer2.upstream.LoadErrorHandlingPolicy;
 import com.google.android.exoplayer2.upstream.TransferListener;
-import java.util.Collections;
+import com.google.android.exoplayer2.util.MimeTypes;
+import com.google.common.collect.ImmutableList;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 
 /**
  * Loads data at a given {@link Uri} as a single sample belonging to a single {@link MediaPeriod}.
@@ -60,23 +62,25 @@ public final class SingleSampleMediaSource extends BaseMediaSource {
 
     /**
      * Sets a tag for the media source which will be published in the {@link Timeline} of the source
-     * as {@link com.google.android.exoplayer2.MediaItem.PlaybackProperties#tag
-     * Window#mediaItem.playbackProperties.tag}.
+     * as {@link MediaItem.LocalConfiguration#tag Window#mediaItem.localConfiguration.tag}.
      *
      * @param tag A tag for the media source.
      * @return This factory, for convenience.
      */
+    @CanIgnoreReturnValue
     public Factory setTag(@Nullable Object tag) {
       this.tag = tag;
       return this;
     }
 
     /**
-     * Sets an optional track id to be used.
-     *
-     * @param trackId An optional track id.
-     * @return This factory, for convenience.
+     * @deprecated Use {@link MediaItem.SubtitleConfiguration.Builder#setId(String)} instead (on the
+     *     {@link MediaItem.SubtitleConfiguration} passed to {@link
+     *     #createMediaSource(MediaItem.SubtitleConfiguration, long)}). {@code trackId} will only be
+     *     used if {@link MediaItem.SubtitleConfiguration#id} is {@code null}.
      */
+    @CanIgnoreReturnValue
+    @Deprecated
     public Factory setTrackId(@Nullable String trackId) {
       this.trackId = trackId;
       return this;
@@ -89,6 +93,7 @@ public final class SingleSampleMediaSource extends BaseMediaSource {
      * @param loadErrorHandlingPolicy A {@link LoadErrorHandlingPolicy}.
      * @return This factory, for convenience.
      */
+    @CanIgnoreReturnValue
     public Factory setLoadErrorHandlingPolicy(
         @Nullable LoadErrorHandlingPolicy loadErrorHandlingPolicy) {
       this.loadErrorHandlingPolicy =
@@ -107,6 +112,7 @@ public final class SingleSampleMediaSource extends BaseMediaSource {
      *     normally by {@link SampleStream#maybeThrowError()}.
      * @return This factory, for convenience.
      */
+    @CanIgnoreReturnValue
     public Factory setTreatLoadErrorsAsEndOfStream(boolean treatLoadErrorsAsEndOfStream) {
       this.treatLoadErrorsAsEndOfStream = treatLoadErrorsAsEndOfStream;
       return this;
@@ -115,28 +121,15 @@ public final class SingleSampleMediaSource extends BaseMediaSource {
     /**
      * Returns a new {@link SingleSampleMediaSource} using the current parameters.
      *
-     * @param subtitle The {@link MediaItem.Subtitle}.
+     * @param subtitleConfiguration The {@link MediaItem.SubtitleConfiguration}.
      * @param durationUs The duration of the media stream in microseconds.
      * @return The new {@link SingleSampleMediaSource}.
      */
-    public SingleSampleMediaSource createMediaSource(MediaItem.Subtitle subtitle, long durationUs) {
+    public SingleSampleMediaSource createMediaSource(
+        MediaItem.SubtitleConfiguration subtitleConfiguration, long durationUs) {
       return new SingleSampleMediaSource(
           trackId,
-          subtitle,
-          dataSourceFactory,
-          durationUs,
-          loadErrorHandlingPolicy,
-          treatLoadErrorsAsEndOfStream,
-          tag);
-    }
-
-    /** @deprecated Use {@link #createMediaSource(MediaItem.Subtitle, long)} instead. */
-    @Deprecated
-    public SingleSampleMediaSource createMediaSource(Uri uri, Format format, long durationUs) {
-      return new SingleSampleMediaSource(
-          format.id == null ? trackId : format.id,
-          new MediaItem.Subtitle(
-              uri, checkNotNull(format.sampleMimeType), format.language, format.selectionFlags),
+          subtitleConfiguration,
           dataSourceFactory,
           durationUs,
           loadErrorHandlingPolicy,
@@ -158,7 +151,7 @@ public final class SingleSampleMediaSource extends BaseMediaSource {
 
   private SingleSampleMediaSource(
       @Nullable String trackId,
-      MediaItem.Subtitle subtitle,
+      MediaItem.SubtitleConfiguration subtitleConfiguration,
       DataSource.Factory dataSourceFactory,
       long durationUs,
       LoadErrorHandlingPolicy loadErrorHandlingPolicy,
@@ -168,25 +161,28 @@ public final class SingleSampleMediaSource extends BaseMediaSource {
     this.durationUs = durationUs;
     this.loadErrorHandlingPolicy = loadErrorHandlingPolicy;
     this.treatLoadErrorsAsEndOfStream = treatLoadErrorsAsEndOfStream;
-    mediaItem =
+    this.mediaItem =
         new MediaItem.Builder()
             .setUri(Uri.EMPTY)
-            .setMediaId(subtitle.uri.toString())
-            .setSubtitles(Collections.singletonList(subtitle))
+            .setMediaId(subtitleConfiguration.uri.toString())
+            .setSubtitleConfigurations(ImmutableList.of(subtitleConfiguration))
             .setTag(tag)
             .build();
-    format =
+    this.format =
         new Format.Builder()
-            .setId(trackId)
-            .setSampleMimeType(subtitle.mimeType)
-            .setLanguage(subtitle.language)
-            .setSelectionFlags(subtitle.selectionFlags)
-            .setRoleFlags(subtitle.roleFlags)
-            .setLabel(subtitle.label)
+            .setSampleMimeType(firstNonNull(subtitleConfiguration.mimeType, MimeTypes.TEXT_UNKNOWN))
+            .setLanguage(subtitleConfiguration.language)
+            .setSelectionFlags(subtitleConfiguration.selectionFlags)
+            .setRoleFlags(subtitleConfiguration.roleFlags)
+            .setLabel(subtitleConfiguration.label)
+            .setId(subtitleConfiguration.id != null ? subtitleConfiguration.id : trackId)
             .build();
-    dataSpec =
-        new DataSpec.Builder().setUri(subtitle.uri).setFlags(DataSpec.FLAG_ALLOW_GZIP).build();
-    timeline =
+    this.dataSpec =
+        new DataSpec.Builder()
+            .setUri(subtitleConfiguration.uri)
+            .setFlags(DataSpec.FLAG_ALLOW_GZIP)
+            .build();
+    this.timeline =
         new SinglePeriodTimeline(
             durationUs,
             /* isSeekable= */ true,
@@ -197,17 +193,6 @@ public final class SingleSampleMediaSource extends BaseMediaSource {
   }
 
   // MediaSource implementation.
-
-  /**
-   * @deprecated Use {@link #getMediaItem()} and {@link MediaItem.PlaybackProperties#tag} instead.
-   */
-  @SuppressWarnings("deprecation")
-  @Deprecated
-  @Override
-  @Nullable
-  public Object getTag() {
-    return castNonNull(mediaItem.playbackProperties).tag;
-  }
 
   @Override
   public MediaItem getMediaItem() {

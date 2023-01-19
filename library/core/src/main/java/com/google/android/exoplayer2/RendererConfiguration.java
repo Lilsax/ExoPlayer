@@ -17,9 +17,7 @@ package com.google.android.exoplayer2;
 
 import androidx.annotation.Nullable;
 
-/**
- * The configuration of a {@link Renderer}.
- */
+/** The configuration of a {@link Renderer}. */
 public final class RendererConfiguration {
 
   /** The default configuration. */
@@ -29,7 +27,9 @@ public final class RendererConfiguration {
   /** Whether to enable tunneling. */
   public final boolean tunneling;
 
-  /** @param tunneling Whether to enable tunneling. */
+  /**
+   * @param tunneling Whether to enable tunneling.
+   */
   public RendererConfiguration(boolean tunneling) {
     this.tunneling = tunneling;
   }

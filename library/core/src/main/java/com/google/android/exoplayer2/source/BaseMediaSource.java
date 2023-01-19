@@ -15,10 +15,13 @@
  */
 package com.google.android.exoplayer2.source;
 
+import static com.google.android.exoplayer2.util.Assertions.checkStateNotNull;
+
 import android.os.Handler;
 import android.os.Looper;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.Timeline;
+import com.google.android.exoplayer2.analytics.PlayerId;
 import com.google.android.exoplayer2.drm.DrmSessionEventListener;
 import com.google.android.exoplayer2.upstream.TransferListener;
 import com.google.android.exoplayer2.util.Assertions;
@@ -41,6 +44,7 @@ public abstract class BaseMediaSource implements MediaSource {
 
   @Nullable private Looper looper;
   @Nullable private Timeline timeline;
+  @Nullable private PlayerId playerId;
 
   public BaseMediaSource() {
     mediaSourceCallers = new ArrayList<>(/* initialCapacity= */ 1);
@@ -51,7 +55,7 @@ public abstract class BaseMediaSource implements MediaSource {
 
   /**
    * Starts source preparation and enables the source, see {@link #prepareSource(MediaSourceCaller,
-   * TransferListener)}. This method is called at most once until the next call to {@link
+   * TransferListener, PlayerId)}. This method is called at most once until the next call to {@link
    * #releaseSourceInternal()}.
    *
    * @param mediaTransferListener The transfer listener which should be informed of any media data
@@ -87,7 +91,7 @@ public abstract class BaseMediaSource implements MediaSource {
 
   /**
    * Returns a {@link MediaSourceEventListener.EventDispatcher} which dispatches all events to the
-   * registered listeners with the specified media period id.
+   * registered listeners with the specified {@link MediaPeriodId}.
    *
    * @param mediaPeriodId The {@link MediaPeriodId} to be reported with the events. May be null, if
    *     the events do not belong to a specific media period.
@@ -101,7 +105,7 @@ public abstract class BaseMediaSource implements MediaSource {
 
   /**
    * Returns a {@link MediaSourceEventListener.EventDispatcher} which dispatches all events to the
-   * registered listeners with the specified media period id and time offset.
+   * registered listeners with the specified {@link MediaPeriodId} and time offset.
    *
    * @param mediaPeriodId The {@link MediaPeriodId} to be reported with the events.
    * @param mediaTimeOffsetMs The offset to be added to all media times, in milliseconds.
@@ -115,7 +119,7 @@ public abstract class BaseMediaSource implements MediaSource {
 
   /**
    * Returns a {@link MediaSourceEventListener.EventDispatcher} which dispatches all events to the
-   * registered listeners with the specified window index, media period id and time offset.
+   * registered listeners with the specified window index, {@link MediaPeriodId} and time offset.
    *
    * @param windowIndex The timeline window index to be reported with the events.
    * @param mediaPeriodId The {@link MediaPeriodId} to be reported with the events. May be null, if
@@ -130,7 +134,7 @@ public abstract class BaseMediaSource implements MediaSource {
 
   /**
    * Returns a {@link DrmSessionEventListener.EventDispatcher} which dispatches all events to the
-   * registered listeners with the specified media period id.
+   * registered listeners with the specified {@link MediaPeriodId}
    *
    * @param mediaPeriodId The {@link MediaPeriodId} to be reported with the events. May be null, if
    *     the events do not belong to a specific media period.
@@ -143,7 +147,7 @@ public abstract class BaseMediaSource implements MediaSource {
 
   /**
    * Returns a {@link DrmSessionEventListener.EventDispatcher} which dispatches all events to the
-   * registered listeners with the specified window index and media period id.
+   * registered listeners with the specified window index and {@link MediaPeriodId}.
    *
    * @param windowIndex The timeline window index to be reported with the events.
    * @param mediaPeriodId The {@link MediaPeriodId} to be reported with the events. May be null, if
@@ -158,6 +162,16 @@ public abstract class BaseMediaSource implements MediaSource {
   /** Returns whether the source is enabled. */
   protected final boolean isEnabled() {
     return !enabledMediaSourceCallers.isEmpty();
+  }
+
+  /**
+   * Returns the {@link PlayerId} of the player using this media source.
+   *
+   * <p>Must only be used when the media source is {@link #prepareSourceInternal(TransferListener)
+   * prepared}.
+   */
+  protected final PlayerId getPlayerId() {
+    return checkStateNotNull(playerId);
   }
 
   @Override
@@ -184,11 +198,21 @@ public abstract class BaseMediaSource implements MediaSource {
     drmEventDispatcher.removeEventListener(eventListener);
   }
 
+  @SuppressWarnings("deprecation") // Overriding deprecated method to make it final.
   @Override
   public final void prepareSource(
       MediaSourceCaller caller, @Nullable TransferListener mediaTransferListener) {
+    prepareSource(caller, mediaTransferListener, PlayerId.UNSET);
+  }
+
+  @Override
+  public final void prepareSource(
+      MediaSourceCaller caller,
+      @Nullable TransferListener mediaTransferListener,
+      PlayerId playerId) {
     Looper looper = Looper.myLooper();
     Assertions.checkArgument(this.looper == null || this.looper == looper);
+    this.playerId = playerId;
     @Nullable Timeline timeline = this.timeline;
     mediaSourceCallers.add(caller);
     if (this.looper == null) {
@@ -226,6 +250,7 @@ public abstract class BaseMediaSource implements MediaSource {
     if (mediaSourceCallers.isEmpty()) {
       looper = null;
       timeline = null;
+      playerId = null;
       enabledMediaSourceCallers.clear();
       releaseSourceInternal();
     } else {

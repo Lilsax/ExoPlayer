@@ -34,7 +34,7 @@ import java.util.zip.Inflater;
  *
  * <p>The decoder does not perform CRC checks at the moment.
  */
-public final class ProjectionDecoder {
+/* package */ final class ProjectionDecoder {
 
   private static final int TYPE_YTMP = 0x79746d70;
   private static final int TYPE_MSHP = 0x6d736870;
@@ -58,7 +58,8 @@ public final class ProjectionDecoder {
    * @param stereoMode A {@link C.StereoMode} value.
    * @return The projection or null if the data can't be decoded.
    */
-  public static @Nullable Projection decode(byte[] projectionData, @C.StereoMode int stereoMode) {
+  @Nullable
+  public static Projection decode(byte[] projectionData, @C.StereoMode int stereoMode) {
     ParsableByteArray input = new ParsableByteArray(projectionData);
     // MP4 containers include the proj box but webm containers do not.
     // Both containers use mshp.
@@ -91,7 +92,8 @@ public final class ProjectionDecoder {
     return type == TYPE_PROJ;
   }
 
-  private static @Nullable ArrayList<Mesh> parseProj(ParsableByteArray input) {
+  @Nullable
+  private static ArrayList<Mesh> parseProj(ParsableByteArray input) {
     input.skipBytes(8); // size and type.
     int position = input.getPosition();
     int limit = input.limit();
@@ -112,7 +114,8 @@ public final class ProjectionDecoder {
     return null;
   }
 
-  private static @Nullable ArrayList<Mesh> parseMshp(ParsableByteArray input) {
+  @Nullable
+  private static ArrayList<Mesh> parseMshp(ParsableByteArray input) {
     int version = input.readUnsignedByte();
     if (version != 0) {
       return null;
@@ -137,7 +140,8 @@ public final class ProjectionDecoder {
   }
 
   /** Parses MSHP data after the encoding_four_cc field. */
-  private static @Nullable ArrayList<Mesh> parseRawMshpData(ParsableByteArray input) {
+  @Nullable
+  private static ArrayList<Mesh> parseRawMshpData(ParsableByteArray input) {
     ArrayList<Mesh> meshes = new ArrayList<>();
     int position = input.getPosition();
     int limit = input.limit();
@@ -160,7 +164,8 @@ public final class ProjectionDecoder {
     return meshes;
   }
 
-  private static @Nullable Mesh parseMesh(ParsableByteArray input) {
+  @Nullable
+  private static Mesh parseMesh(ParsableByteArray input) {
     // Read the coordinates.
     int coordinateCount = input.readInt();
     if (coordinateCount > MAX_COORDINATE_COUNT) {

@@ -22,7 +22,6 @@ import androidx.annotation.FloatRange;
 import androidx.annotation.GuardedBy;
 import androidx.annotation.IntRange;
 import androidx.annotation.Nullable;
-import androidx.core.util.ObjectsCompat;
 import androidx.core.util.Pair;
 import androidx.media.AudioAttributesCompat;
 import androidx.media2.common.CallbackMediaItem;
@@ -30,12 +29,11 @@ import androidx.media2.common.FileMediaItem;
 import androidx.media2.common.MediaItem;
 import androidx.media2.common.MediaMetadata;
 import androidx.media2.common.SessionPlayer;
-import com.google.android.exoplayer2.ControlDispatcher;
-import com.google.android.exoplayer2.DefaultControlDispatcher;
 import com.google.android.exoplayer2.ExoPlayerLibraryInfo;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.Log;
+import com.google.android.exoplayer2.util.Util;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import java.util.HashMap;
@@ -87,7 +85,7 @@ public final class SessionPlayerConnector extends SessionPlayer {
 
   /**
    * Creates an instance using {@link DefaultMediaItemConverter} to convert between ExoPlayer and
-   * media2 MediaItems and {@link DefaultControlDispatcher} to dispatch player commands.
+   * media2 MediaItems.
    *
    * @param player The player to wrap.
    */
@@ -96,7 +94,7 @@ public final class SessionPlayerConnector extends SessionPlayer {
   }
 
   /**
-   * Creates an instance using the provided {@link ControlDispatcher} to dispatch player commands.
+   * Creates an instance.
    *
    * @param player The player to wrap.
    * @param mediaItemConverter The {@link MediaItemConverter}.
@@ -111,15 +109,6 @@ public final class SessionPlayerConnector extends SessionPlayer {
 
     this.player = new PlayerWrapper(new ExoPlayerWrapperListener(), player, mediaItemConverter);
     playerCommandQueue = new PlayerCommandQueue(this.player, taskHandler);
-  }
-
-  /**
-   * Sets the {@link ControlDispatcher}.
-   *
-   * @param controlDispatcher The {@link ControlDispatcher}.
-   */
-  public void setControlDispatcher(ControlDispatcher controlDispatcher) {
-    player.setControlDispatcher(controlDispatcher);
   }
 
   @Override
@@ -571,14 +560,13 @@ public final class SessionPlayerConnector extends SessionPlayer {
 
   // TODO(internal b/160846312): Remove this suppress warnings and call onCurrentMediaItemChanged
   // with a null item once we depend on media2 1.2.0.
-  @SuppressWarnings("nullness:argument.type.incompatible")
   private void handlePlaylistChangedOnHandler() {
     List<MediaItem> currentPlaylist = player.getPlaylist();
     MediaMetadata playlistMetadata = player.getPlaylistMetadata();
 
     MediaItem currentMediaItem = player.getCurrentMediaItem();
     boolean notifyCurrentMediaItem =
-        !ObjectsCompat.equals(this.currentMediaItem, currentMediaItem) && currentMediaItem != null;
+        !Util.areEqual(this.currentMediaItem, currentMediaItem) && currentMediaItem != null;
     this.currentMediaItem = currentMediaItem;
 
     long currentPosition = getCurrentPosition();
@@ -594,7 +582,7 @@ public final class SessionPlayerConnector extends SessionPlayer {
 
   private void notifySkipToCompletedOnHandler() {
     MediaItem currentMediaItem = Assertions.checkNotNull(player.getCurrentMediaItem());
-    if (ObjectsCompat.equals(this.currentMediaItem, currentMediaItem)) {
+    if (Util.areEqual(this.currentMediaItem, currentMediaItem)) {
       return;
     }
     this.currentMediaItem = currentMediaItem;
@@ -714,7 +702,7 @@ public final class SessionPlayerConnector extends SessionPlayer {
 
     @Override
     public void onCurrentMediaItemChanged(MediaItem mediaItem) {
-      if (ObjectsCompat.equals(currentMediaItem, mediaItem)) {
+      if (Util.areEqual(currentMediaItem, mediaItem)) {
         return;
       }
       currentMediaItem = mediaItem;

@@ -30,6 +30,7 @@ import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
+import com.google.android.exoplayer2.analytics.PlayerId;
 import com.google.android.exoplayer2.extractor.ChunkIndex;
 import com.google.android.exoplayer2.extractor.DummyTrackOutput;
 import com.google.android.exoplayer2.extractor.ExtractorInput;
@@ -40,7 +41,9 @@ import com.google.android.exoplayer2.source.mediaparser.InputReaderAdapterV30;
 import com.google.android.exoplayer2.source.mediaparser.MediaParserUtil;
 import com.google.android.exoplayer2.source.mediaparser.OutputConsumerAdapterV30;
 import com.google.android.exoplayer2.util.Assertions;
+import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.MimeTypes;
+import com.google.android.exoplayer2.util.Util;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -48,6 +51,27 @@ import java.util.List;
 /** {@link ChunkExtractor} implemented on top of the platform's {@link MediaParser}. */
 @RequiresApi(30)
 public final class MediaParserChunkExtractor implements ChunkExtractor {
+
+  // Maximum TAG length is 23 characters.
+  private static final String TAG = "MediaPrsrChunkExtractor";
+
+  public static final ChunkExtractor.Factory FACTORY =
+      (primaryTrackType,
+          format,
+          enableEventMessageTrack,
+          closedCaptionFormats,
+          playerEmsgTrackOutput,
+          playerId) -> {
+        if (!MimeTypes.isText(format.containerMimeType)) {
+          // Container is either Matroska or Fragmented MP4.
+          return new MediaParserChunkExtractor(
+              primaryTrackType, format, closedCaptionFormats, playerId);
+        } else {
+          // This is either RAWCC (unsupported) or a text track that does not require an extractor.
+          Log.w(TAG, "Ignoring an unsupported text track.");
+          return null;
+        }
+      };
 
   private final OutputConsumerAdapterV30 outputConsumerAdapter;
   private final InputReaderAdapterV30 inputReaderAdapter;
@@ -61,15 +85,19 @@ public final class MediaParserChunkExtractor implements ChunkExtractor {
   /**
    * Creates a new instance.
    *
-   * @param primaryTrackType The type of the primary track, or {@link C#TRACK_TYPE_NONE} if there is
-   *     no primary track. Must be one of the {@link C C.TRACK_TYPE_*} constants.
+   * @param primaryTrackType The {@link C.TrackType type} of the primary track. {@link
+   *     C#TRACK_TYPE_NONE} if there is no primary track.
    * @param manifestFormat The chunks {@link Format} as obtained from the manifest.
    * @param closedCaptionFormats A list containing the {@link Format Formats} of the closed-caption
    *     tracks in the chunks.
+   * @param playerId The {@link PlayerId} of the player this chunk extractor is used for.
    */
   @SuppressLint("WrongConstant")
   public MediaParserChunkExtractor(
-      int primaryTrackType, Format manifestFormat, List<Format> closedCaptionFormats) {
+      @C.TrackType int primaryTrackType,
+      Format manifestFormat,
+      List<Format> closedCaptionFormats,
+      PlayerId playerId) {
     outputConsumerAdapter =
         new OutputConsumerAdapterV30(
             manifestFormat, primaryTrackType, /* expectDummySeekMap= */ true);
@@ -94,6 +122,9 @@ public final class MediaParserChunkExtractor implements ChunkExtractor {
           MediaParserUtil.toCaptionsMediaFormat(closedCaptionFormats.get(i)));
     }
     mediaParser.setParameter(PARAMETER_EXPOSE_CAPTION_FORMATS, closedCaptionMediaFormats);
+    if (Util.SDK_INT >= 31) {
+      MediaParserUtil.setLogSessionIdOnMediaParser(mediaParser, playerId);
+    }
     outputConsumerAdapter.setMuxedCaptionFormats(closedCaptionFormats);
     trackOutputProviderAdapter = new TrackOutputProviderAdapter();
     dummyTrackOutput = new DummyTrackOutput();
@@ -117,9 +148,9 @@ public final class MediaParserChunkExtractor implements ChunkExtractor {
   }
 
   @Override
-  public boolean read(ExtractorInput extractorInput) throws IOException {
+  public boolean read(ExtractorInput input) throws IOException {
     maybeExecutePendingSeek();
-    inputReaderAdapter.setDataReader(extractorInput, extractorInput.getLength());
+    inputReaderAdapter.setDataReader(input, input.getLength());
     return mediaParser.advance(inputReaderAdapter);
   }
 

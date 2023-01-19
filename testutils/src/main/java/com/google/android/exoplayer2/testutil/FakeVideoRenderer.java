@@ -18,6 +18,7 @@ package com.google.android.exoplayer2.testutil;
 
 import android.os.Handler;
 import android.os.SystemClock;
+import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.Format;
@@ -25,6 +26,7 @@ import com.google.android.exoplayer2.Renderer;
 import com.google.android.exoplayer2.decoder.DecoderCounters;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.video.VideoRendererEventListener;
+import com.google.android.exoplayer2.video.VideoSize;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
 /** A {@link FakeRenderer} that supports {@link C#TRACK_TYPE_VIDEO}. */
@@ -33,6 +35,7 @@ public class FakeVideoRenderer extends FakeRenderer {
   private final VideoRendererEventListener.EventDispatcher eventDispatcher;
   private final DecoderCounters decoderCounters;
   private @MonotonicNonNull Format format;
+  @Nullable private Object output;
   private long streamOffsetUs;
   private boolean renderedFirstFrameAfterReset;
   private boolean mayRenderFirstFrameAfterEnableIfNotStarted;
@@ -58,9 +61,7 @@ public class FakeVideoRenderer extends FakeRenderer {
       throws ExoPlaybackException {
     super.onStreamChanged(formats, startPositionUs, offsetUs);
     streamOffsetUs = offsetUs;
-    if (renderedFirstFrameAfterReset) {
-      renderedFirstFrameAfterReset = false;
-    }
+    renderedFirstFrameAfterReset = false;
   }
 
   @Override
@@ -94,18 +95,46 @@ public class FakeVideoRenderer extends FakeRenderer {
   }
 
   @Override
+  public void handleMessage(@MessageType int messageType, @Nullable Object message)
+      throws ExoPlaybackException {
+    switch (messageType) {
+      case MSG_SET_VIDEO_OUTPUT:
+        output = message;
+        renderedFirstFrameAfterReset = false;
+        break;
+
+      case Renderer.MSG_SET_AUDIO_ATTRIBUTES:
+      case Renderer.MSG_SET_AUDIO_SESSION_ID:
+      case Renderer.MSG_SET_AUX_EFFECT_INFO:
+      case Renderer.MSG_SET_CAMERA_MOTION_LISTENER:
+      case Renderer.MSG_SET_CHANGE_FRAME_RATE_STRATEGY:
+      case Renderer.MSG_SET_SCALING_MODE:
+      case Renderer.MSG_SET_SKIP_SILENCE_ENABLED:
+      case Renderer.MSG_SET_VIDEO_FRAME_METADATA_LISTENER:
+      case Renderer.MSG_SET_VOLUME:
+      case Renderer.MSG_SET_WAKEUP_LISTENER:
+      default:
+        super.handleMessage(messageType, message);
+    }
+  }
+
+  @Override
   protected boolean shouldProcessBuffer(long bufferTimeUs, long playbackPositionUs) {
     boolean shouldProcess = super.shouldProcessBuffer(bufferTimeUs, playbackPositionUs);
     boolean shouldRenderFirstFrame =
-        !renderedFirstFrameAfterEnable
-            ? (getState() == Renderer.STATE_STARTED || mayRenderFirstFrameAfterEnableIfNotStarted)
-            : !renderedFirstFrameAfterReset;
+        output != null
+            && (!renderedFirstFrameAfterEnable
+                ? (getState() == Renderer.STATE_STARTED
+                    || mayRenderFirstFrameAfterEnableIfNotStarted)
+                : !renderedFirstFrameAfterReset);
     shouldProcess |= shouldRenderFirstFrame && playbackPositionUs >= streamOffsetUs;
-    if (shouldProcess && !renderedFirstFrameAfterReset) {
+    @Nullable Object output = this.output;
+    if (shouldProcess && !renderedFirstFrameAfterReset && output != null) {
       @MonotonicNonNull Format format = Assertions.checkNotNull(this.format);
       eventDispatcher.videoSizeChanged(
-          format.width, format.height, format.rotationDegrees, format.pixelWidthHeightRatio);
-      eventDispatcher.renderedFirstFrame(/* surface= */ null);
+          new VideoSize(
+              format.width, format.height, format.rotationDegrees, format.pixelWidthHeightRatio));
+      eventDispatcher.renderedFirstFrame(output);
       renderedFirstFrameAfterReset = true;
       renderedFirstFrameAfterEnable = true;
     }

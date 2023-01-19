@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 The Android Open Source Project
+ * Copyright 2021 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,34 +16,62 @@
 
 package com.google.android.exoplayer2.transformer;
 
+import static com.google.android.exoplayer2.source.SampleStream.FLAG_REQUIRE_FORMAT;
 import static com.google.android.exoplayer2.util.Assertions.checkNotNull;
 
-import androidx.annotation.Nullable;
-import androidx.annotation.RequiresApi;
+import android.content.Context;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.FormatHolder;
 import com.google.android.exoplayer2.decoder.DecoderInputBuffer;
-import com.google.android.exoplayer2.source.SampleStream;
-import java.nio.ByteBuffer;
+import com.google.android.exoplayer2.source.SampleStream.ReadDataResult;
+import com.google.android.exoplayer2.util.DebugViewProvider;
+import com.google.android.exoplayer2.util.Effect;
+import com.google.android.exoplayer2.util.FrameProcessor;
+import com.google.common.collect.ImmutableList;
 
-@RequiresApi(18)
 /* package */ final class TransformerVideoRenderer extends TransformerBaseRenderer {
 
-  private static final String TAG = "TransformerVideoRenderer";
+  private static final String TAG = "TVideoRenderer";
 
-  private final DecoderInputBuffer buffer;
-
-  @Nullable private SampleTransformer sampleTransformer;
-
-  private boolean formatRead;
-  private boolean isBufferPending;
-  private boolean isInputStreamEnded;
+  private final Context context;
+  private final boolean clippingStartsAtKeyFrame;
+  private final ImmutableList<Effect> effects;
+  private final FrameProcessor.Factory frameProcessorFactory;
+  private final Codec.EncoderFactory encoderFactory;
+  private final Codec.DecoderFactory decoderFactory;
+  private final DebugViewProvider debugViewProvider;
+  private final DecoderInputBuffer decoderInputBuffer;
 
   public TransformerVideoRenderer(
-      MuxerWrapper muxerWrapper, TransformerMediaClock mediaClock, Transformation transformation) {
-    super(C.TRACK_TYPE_VIDEO, muxerWrapper, mediaClock, transformation);
-    buffer = new DecoderInputBuffer(DecoderInputBuffer.BUFFER_REPLACEMENT_MODE_DIRECT);
+      Context context,
+      MuxerWrapper muxerWrapper,
+      TransformerMediaClock mediaClock,
+      TransformationRequest transformationRequest,
+      boolean clippingStartsAtKeyFrame,
+      ImmutableList<Effect> effects,
+      FrameProcessor.Factory frameProcessorFactory,
+      Codec.EncoderFactory encoderFactory,
+      Codec.DecoderFactory decoderFactory,
+      Transformer.AsyncErrorListener asyncErrorListener,
+      FallbackListener fallbackListener,
+      DebugViewProvider debugViewProvider) {
+    super(
+        C.TRACK_TYPE_VIDEO,
+        muxerWrapper,
+        mediaClock,
+        transformationRequest,
+        asyncErrorListener,
+        fallbackListener);
+    this.context = context;
+    this.clippingStartsAtKeyFrame = clippingStartsAtKeyFrame;
+    this.effects = effects;
+    this.frameProcessorFactory = frameProcessorFactory;
+    this.encoderFactory = encoderFactory;
+    this.decoderFactory = decoderFactory;
+    this.debugViewProvider = debugViewProvider;
+    decoderInputBuffer =
+        new DecoderInputBuffer(DecoderInputBuffer.BUFFER_REPLACEMENT_MODE_DISABLED);
   }
 
   @Override
@@ -51,78 +79,91 @@ import java.nio.ByteBuffer;
     return TAG;
   }
 
+  /** Attempts to read the input format and to initialize the {@link SamplePipeline}. */
   @Override
-  public void render(long positionUs, long elapsedRealtimeUs) {
-    if (!isRendererStarted || isEnded()) {
-      return;
+  protected boolean ensureConfigured() throws TransformationException {
+    if (samplePipeline != null) {
+      return true;
     }
-
-    if (!formatRead) {
-      FormatHolder formatHolder = getFormatHolder();
-      @SampleStream.ReadDataResult
-      int result = readSource(formatHolder, buffer, /* formatRequired= */ true);
-      if (result != C.RESULT_FORMAT_READ) {
-        return;
-      }
-      Format format = checkNotNull(formatHolder.format);
-      formatRead = true;
-      if (transformation.flattenForSlowMotion) {
-        sampleTransformer = new SefSlowMotionVideoSampleTransformer(format);
-      }
-      muxerWrapper.addTrackFormat(format);
-    }
-
-    while (true) {
-      // Read sample.
-      if (!isBufferPending && !readAndTransformBuffer()) {
-        return;
-      }
-      // Write sample.
-      isBufferPending =
-          !muxerWrapper.writeSample(
-              getTrackType(), buffer.data, buffer.isKeyFrame(), buffer.timeUs);
-      if (isBufferPending) {
-        return;
-      }
-    }
-  }
-
-  @Override
-  public boolean isEnded() {
-    return isInputStreamEnded;
-  }
-
-  /**
-   * Checks whether a sample can be read and, if so, reads it, transforms it and writes the
-   * resulting sample to the {@link #buffer}.
-   *
-   * <p>The buffer data can be set to null if the transformation applied discards the sample.
-   *
-   * @return Whether a sample has been read and transformed.
-   */
-  private boolean readAndTransformBuffer() {
-    buffer.clear();
-    @SampleStream.ReadDataResult
-    int result = readSource(getFormatHolder(), buffer, /* formatRequired= */ false);
-    if (result == C.RESULT_FORMAT_READ) {
-      throw new IllegalStateException("Format changes are not supported.");
-    } else if (result == C.RESULT_NOTHING_READ) {
+    FormatHolder formatHolder = getFormatHolder();
+    @ReadDataResult
+    int result = readSource(formatHolder, decoderInputBuffer, /* readFlags= */ FLAG_REQUIRE_FORMAT);
+    if (result != C.RESULT_FORMAT_READ) {
       return false;
     }
-
-    // Buffer read.
-
-    if (buffer.isEndOfStream()) {
-      isInputStreamEnded = true;
-      muxerWrapper.endTrack(getTrackType());
-      return false;
-    }
-    mediaClock.updateTimeForTrackType(getTrackType(), buffer.timeUs);
-    ByteBuffer data = checkNotNull(buffer.data);
-    data.flip();
-    if (sampleTransformer != null) {
-      sampleTransformer.transformSample(buffer);
+    Format inputFormat = checkNotNull(formatHolder.format);
+    if (shouldTranscode(inputFormat)) {
+      samplePipeline =
+          new VideoTranscodingSamplePipeline(
+              context,
+              inputFormat,
+              streamOffsetUs,
+              streamStartPositionUs,
+              transformationRequest,
+              effects,
+              frameProcessorFactory,
+              decoderFactory,
+              encoderFactory,
+              muxerWrapper,
+              fallbackListener,
+              asyncErrorListener,
+              debugViewProvider);
+    } else {
+      samplePipeline =
+          new PassthroughSamplePipeline(
+              inputFormat,
+              streamOffsetUs,
+              streamStartPositionUs,
+              transformationRequest,
+              muxerWrapper,
+              fallbackListener);
     }
     return true;
+  }
+
+  private boolean shouldTranscode(Format inputFormat) {
+    if ((streamStartPositionUs - streamOffsetUs) != 0 && !clippingStartsAtKeyFrame) {
+      return true;
+    }
+    if (encoderFactory.videoNeedsEncoding()) {
+      return true;
+    }
+    if (transformationRequest.enableRequestSdrToneMapping) {
+      return true;
+    }
+    if (transformationRequest.forceInterpretHdrVideoAsSdr) {
+      return true;
+    }
+    if (transformationRequest.videoMimeType != null
+        && !transformationRequest.videoMimeType.equals(inputFormat.sampleMimeType)) {
+      return true;
+    }
+    if (transformationRequest.videoMimeType == null
+        && !muxerWrapper.supportsSampleMimeType(inputFormat.sampleMimeType)) {
+      return true;
+    }
+    if (inputFormat.pixelWidthHeightRatio != 1f) {
+      return true;
+    }
+    if (transformationRequest.rotationDegrees != 0f) {
+      return true;
+    }
+    if (transformationRequest.scaleX != 1f) {
+      return true;
+    }
+    if (transformationRequest.scaleY != 1f) {
+      return true;
+    }
+    // The decoder rotates encoded frames for display by inputFormat.rotationDegrees.
+    int decodedHeight =
+        (inputFormat.rotationDegrees % 180 == 0) ? inputFormat.height : inputFormat.width;
+    if (transformationRequest.outputHeight != C.LENGTH_UNSET
+        && transformationRequest.outputHeight != decodedHeight) {
+      return true;
+    }
+    if (!effects.isEmpty()) {
+      return true;
+    }
+    return false;
   }
 }

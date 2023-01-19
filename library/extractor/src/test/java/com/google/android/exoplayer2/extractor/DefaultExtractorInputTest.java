@@ -43,8 +43,7 @@ public class DefaultExtractorInputTest {
   @Test
   public void initialPosition() throws Exception {
     FakeDataSource testDataSource = buildDataSource();
-    DefaultExtractorInput input =
-        new DefaultExtractorInput(testDataSource, 123, C.LENGTH_UNSET);
+    DefaultExtractorInput input = new DefaultExtractorInput(testDataSource, 123, C.LENGTH_UNSET);
     assertThat(input.getPosition()).isEqualTo(123);
   }
 
@@ -227,12 +226,16 @@ public class DefaultExtractorInputTest {
 
   @Test
   public void largeSkip() throws Exception {
-    DefaultExtractorInput input = createDefaultExtractorInput();
+    FakeDataSource testDataSource = buildLargeDataSource();
+    DefaultExtractorInput input = new DefaultExtractorInput(testDataSource, 0, C.LENGTH_UNSET);
     // Check that skipping the entire data source succeeds.
     int bytesToSkip = LARGE_TEST_DATA_LENGTH;
     while (bytesToSkip > 0) {
-      bytesToSkip -= input.skip(bytesToSkip);
+      int skipped = input.skip(bytesToSkip);
+      assertThat(skipped).isGreaterThan(0);
+      bytesToSkip -= skipped;
     }
+    assertThat(bytesToSkip).isEqualTo(0);
   }
 
   @Test
@@ -604,7 +607,9 @@ public class DefaultExtractorInputTest {
 
   private static FakeDataSource buildDataSource() throws Exception {
     FakeDataSource testDataSource = new FakeDataSource();
-    testDataSource.getDataSet().newDefaultData()
+    testDataSource
+        .getDataSet()
+        .newDefaultData()
         .appendReadData(Arrays.copyOfRange(TEST_DATA, 0, 3))
         .appendReadData(Arrays.copyOfRange(TEST_DATA, 3, 6))
         .appendReadData(Arrays.copyOfRange(TEST_DATA, 6, 9));
@@ -612,9 +617,18 @@ public class DefaultExtractorInputTest {
     return testDataSource;
   }
 
+  private static FakeDataSource buildLargeDataSource() throws Exception {
+    FakeDataSource testDataSource = new FakeDataSource();
+    testDataSource.getDataSet().newDefaultData().appendReadData(new byte[LARGE_TEST_DATA_LENGTH]);
+    testDataSource.open(new DataSpec(Uri.parse(TEST_URI)));
+    return testDataSource;
+  }
+
   private static FakeDataSource buildFailingDataSource() throws Exception {
     FakeDataSource testDataSource = new FakeDataSource();
-    testDataSource.getDataSet().newDefaultData()
+    testDataSource
+        .getDataSet()
+        .newDefaultData()
         .appendReadData(Arrays.copyOfRange(TEST_DATA, 0, 6))
         .appendReadError(new IOException())
         .appendReadData(Arrays.copyOfRange(TEST_DATA, 6, 9));
@@ -626,5 +640,4 @@ public class DefaultExtractorInputTest {
     FakeDataSource testDataSource = buildDataSource();
     return new DefaultExtractorInput(testDataSource, 0, C.LENGTH_UNSET);
   }
-
 }

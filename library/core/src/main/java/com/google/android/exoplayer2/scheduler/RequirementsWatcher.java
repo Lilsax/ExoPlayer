@@ -60,7 +60,7 @@ public final class RequirementsWatcher {
 
   @Nullable private DeviceStatusChangeReceiver receiver;
 
-  @Requirements.RequirementFlags private int notMetRequirements;
+  private @Requirements.RequirementFlags int notMetRequirements;
   @Nullable private NetworkCallback networkCallback;
 
   /**
@@ -81,8 +81,7 @@ public final class RequirementsWatcher {
    *
    * @return Initial {@link Requirements.RequirementFlags RequirementFlags} that are not met, or 0.
    */
-  @Requirements.RequirementFlags
-  public int start() {
+  public @Requirements.RequirementFlags int start() {
     notMetRequirements = requirements.getNotMetRequirements(context);
 
     IntentFilter filter = new IntentFilter();
@@ -110,7 +109,7 @@ public final class RequirementsWatcher {
       filter.addAction(Intent.ACTION_DEVICE_STORAGE_OK);
     }
     receiver = new DeviceStatusChangeReceiver();
-    context.registerReceiver(receiver, filter, null, handler);
+    Util.registerReceiverNotExported(context, receiver, filter, handler);
     return notMetRequirements;
   }
 

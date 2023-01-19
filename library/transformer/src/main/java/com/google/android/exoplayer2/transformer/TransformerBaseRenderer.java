@@ -16,52 +16,60 @@
 
 package com.google.android.exoplayer2.transformer;
 
-
 import androidx.annotation.Nullable;
-import androidx.annotation.RequiresApi;
 import com.google.android.exoplayer2.BaseRenderer;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.RendererCapabilities;
+import com.google.android.exoplayer2.decoder.DecoderInputBuffer;
+import com.google.android.exoplayer2.source.SampleStream.ReadDataResult;
 import com.google.android.exoplayer2.util.MediaClock;
 import com.google.android.exoplayer2.util.MimeTypes;
+import com.google.errorprone.annotations.ForOverride;
+import org.checkerframework.checker.nullness.qual.EnsuresNonNullIf;
+import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
+import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
-@RequiresApi(18)
 /* package */ abstract class TransformerBaseRenderer extends BaseRenderer {
 
   protected final MuxerWrapper muxerWrapper;
   protected final TransformerMediaClock mediaClock;
-  protected final Transformation transformation;
+  protected final TransformationRequest transformationRequest;
+  protected final Transformer.AsyncErrorListener asyncErrorListener;
+  protected final FallbackListener fallbackListener;
 
-  protected boolean isRendererStarted;
+  private boolean isTransformationRunning;
+  protected long streamOffsetUs;
+  protected long streamStartPositionUs;
+  protected @MonotonicNonNull SamplePipeline samplePipeline;
 
   public TransformerBaseRenderer(
       int trackType,
       MuxerWrapper muxerWrapper,
       TransformerMediaClock mediaClock,
-      Transformation transformation) {
+      TransformationRequest transformationRequest,
+      Transformer.AsyncErrorListener asyncErrorListener,
+      FallbackListener fallbackListener) {
     super(trackType);
     this.muxerWrapper = muxerWrapper;
     this.mediaClock = mediaClock;
-    this.transformation = transformation;
+    this.transformationRequest = transformationRequest;
+    this.asyncErrorListener = asyncErrorListener;
+    this.fallbackListener = fallbackListener;
   }
 
+  /**
+   * Returns whether the renderer supports the track type of the given format.
+   *
+   * @param format The format.
+   * @return The {@link Capabilities} for this format.
+   */
   @Override
-  @C.FormatSupport
-  public final int supportsFormat(Format format) {
-    @Nullable String sampleMimeType = format.sampleMimeType;
-    if (MimeTypes.getTrackType(sampleMimeType) != getTrackType()) {
-      return RendererCapabilities.create(C.FORMAT_UNSUPPORTED_TYPE);
-    } else if (muxerWrapper.supportsSampleMimeType(sampleMimeType)) {
-      return RendererCapabilities.create(C.FORMAT_HANDLED);
-    } else {
-      return RendererCapabilities.create(C.FORMAT_UNSUPPORTED_SUBTYPE);
-    }
-  }
-
-  @Override
-  public final boolean isReady() {
-    return isSourceReady();
+  public final @Capabilities int supportsFormat(Format format) {
+    return RendererCapabilities.create(
+        MimeTypes.getTrackType(format.sampleMimeType) == getTrackType()
+            ? C.FORMAT_HANDLED
+            : C.FORMAT_UNSUPPORTED_TYPE);
   }
 
   @Override
@@ -70,18 +78,93 @@ import com.google.android.exoplayer2.util.MimeTypes;
   }
 
   @Override
+  public final boolean isReady() {
+    return isSourceReady();
+  }
+
+  @Override
+  public final boolean isEnded() {
+    return samplePipeline != null && samplePipeline.isEnded();
+  }
+
+  @Override
+  public final void render(long positionUs, long elapsedRealtimeUs) {
+    try {
+      if (!isTransformationRunning || isEnded() || !ensureConfigured()) {
+        return;
+      }
+
+      while (samplePipeline.processData() || feedPipelineFromInput()) {}
+    } catch (TransformationException e) {
+      isTransformationRunning = false;
+      asyncErrorListener.onTransformationException(e);
+    }
+  }
+
+  @Override
+  protected final void onStreamChanged(Format[] formats, long startPositionUs, long offsetUs) {
+    this.streamOffsetUs = offsetUs;
+    this.streamStartPositionUs = startPositionUs;
+  }
+
+  @Override
   protected final void onEnabled(boolean joining, boolean mayRenderStartOfStream) {
     muxerWrapper.registerTrack();
+    fallbackListener.registerTrack();
     mediaClock.updateTimeForTrackType(getTrackType(), 0L);
   }
 
   @Override
   protected final void onStarted() {
-    isRendererStarted = true;
+    isTransformationRunning = true;
   }
 
   @Override
   protected final void onStopped() {
-    isRendererStarted = false;
+    isTransformationRunning = false;
+  }
+
+  @Override
+  protected final void onReset() {
+    if (samplePipeline != null) {
+      samplePipeline.release();
+    }
+  }
+
+  @ForOverride
+  @EnsuresNonNullIf(expression = "samplePipeline", result = true)
+  protected abstract boolean ensureConfigured() throws TransformationException;
+
+  /**
+   * Attempts to read input data and pass the input data to the sample pipeline.
+   *
+   * @return Whether it may be possible to read more data immediately by calling this method again.
+   * @throws TransformationException If a {@link SamplePipeline} problem occurs.
+   */
+  @RequiresNonNull("samplePipeline")
+  private boolean feedPipelineFromInput() throws TransformationException {
+    @Nullable DecoderInputBuffer samplePipelineInputBuffer = samplePipeline.dequeueInputBuffer();
+    if (samplePipelineInputBuffer == null) {
+      return false;
+    }
+
+    @ReadDataResult
+    int result = readSource(getFormatHolder(), samplePipelineInputBuffer, /* readFlags= */ 0);
+    switch (result) {
+      case C.RESULT_BUFFER_READ:
+        samplePipelineInputBuffer.flip();
+        if (samplePipelineInputBuffer.isEndOfStream()) {
+          samplePipeline.queueInputBuffer();
+          return false;
+        }
+        mediaClock.updateTimeForTrackType(getTrackType(), samplePipelineInputBuffer.timeUs);
+        samplePipeline.queueInputBuffer();
+        return true;
+      case C.RESULT_FORMAT_READ:
+        throw new IllegalStateException("Format changes are not supported.");
+      case C.RESULT_NOTHING_READ:
+      default:
+        return false;
+    }
   }
 }

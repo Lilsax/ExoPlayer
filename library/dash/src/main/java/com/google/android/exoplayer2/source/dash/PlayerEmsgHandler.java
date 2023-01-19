@@ -135,7 +135,7 @@ public final class PlayerEmsgHandler implements Handler.Callback {
       return true;
     }
     switch (message.what) {
-      case (EMSG_MANIFEST_EXPIRED):
+      case EMSG_MANIFEST_EXPIRED:
         ManifestExpiryEventInfo messageObj = (ManifestExpiryEventInfo) message.obj;
         handleManifestExpiredMessage(
             messageObj.eventTimeUs, messageObj.manifestPublishTimeMsInEmsg);
@@ -205,7 +205,8 @@ public final class PlayerEmsgHandler implements Handler.Callback {
     }
   }
 
-  private @Nullable Map.Entry<Long, Long> ceilingExpiryEntryForPublishTime(long publishTimeMs) {
+  @Nullable
+  private Map.Entry<Long, Long> ceilingExpiryEntryForPublishTime(long publishTimeMs) {
     return manifestPublishTimeToExpiryTimeUs.ceilingEntry(publishTimeMs);
   }
 
@@ -289,8 +290,8 @@ public final class PlayerEmsgHandler implements Handler.Callback {
 
     @Override
     public void sampleMetadata(
-        long timeUs, int flags, int size, int offset, @Nullable CryptoData encryptionData) {
-      sampleQueue.sampleMetadata(timeUs, flags, size, offset, encryptionData);
+        long timeUs, int flags, int size, int offset, @Nullable CryptoData cryptoData) {
+      sampleQueue.sampleMetadata(timeUs, flags, size, offset, cryptoData);
       parseAndDiscardSamples();
     }
 
@@ -360,8 +361,7 @@ public final class PlayerEmsgHandler implements Handler.Callback {
     private MetadataInputBuffer dequeueSample() {
       buffer.clear();
       int result =
-          sampleQueue.read(
-              formatHolder, buffer, /* formatRequired= */ false, /* loadingFinished= */ false);
+          sampleQueue.read(formatHolder, buffer, /* readFlags= */ 0, /* loadingFinished= */ false);
       if (result == C.RESULT_BUFFER_READ) {
         buffer.flip();
         return buffer;

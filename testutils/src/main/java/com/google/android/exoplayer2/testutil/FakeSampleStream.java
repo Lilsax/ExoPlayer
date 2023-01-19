@@ -17,7 +17,6 @@ package com.google.android.exoplayer2.testutil;
 
 import static com.google.android.exoplayer2.util.Assertions.checkNotNull;
 
-import android.os.Looper;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
@@ -43,7 +42,7 @@ import java.util.List;
  */
 public class FakeSampleStream implements SampleStream {
 
-  /** Item to customize a return value of {@link FakeSampleStream#readData}. */
+  /** Item to customize a return value of {@link SampleStream#readData}. */
   public static final class FakeSampleStreamItem {
 
     /** Item that designates the end of stream has been reached. */
@@ -136,12 +135,7 @@ public class FakeSampleStream implements SampleStream {
       DrmSessionEventListener.EventDispatcher drmEventDispatcher,
       Format initialFormat,
       List<FakeSampleStreamItem> fakeSampleStreamItems) {
-    this.sampleQueue =
-        SampleQueue.createWithDrm(
-            allocator,
-            /* playbackLooper= */ checkNotNull(Looper.myLooper()),
-            drmSessionManager,
-            drmEventDispatcher);
+    this.sampleQueue = SampleQueue.createWithDrm(allocator, drmSessionManager, drmEventDispatcher);
     this.mediaSourceEventDispatcher = mediaSourceEventDispatcher;
     this.sampleStreamItems = new ArrayList<>();
     sampleStreamItems.add(FakeSampleStreamItem.format(initialFormat));
@@ -265,12 +259,12 @@ public class FakeSampleStream implements SampleStream {
 
   @Override
   public int readData(
-      FormatHolder formatHolder, DecoderInputBuffer buffer, boolean formatRequired) {
-    int result = sampleQueue.read(formatHolder, buffer, formatRequired, loadingFinished);
+      FormatHolder formatHolder, DecoderInputBuffer buffer, @ReadFlags int readFlags) {
+    int result = sampleQueue.read(formatHolder, buffer, readFlags, loadingFinished);
     if (result == C.RESULT_FORMAT_READ) {
       downstreamFormat = checkNotNull(formatHolder.format);
     }
-    if (result == C.RESULT_BUFFER_READ && !buffer.isFlagsOnly()) {
+    if (result == C.RESULT_BUFFER_READ && (readFlags & FLAG_OMIT_SAMPLE_DATA) == 0) {
       maybeNotifyDownstreamFormat(buffer.timeUs);
     }
     return result;
@@ -299,7 +293,7 @@ public class FakeSampleStream implements SampleStream {
 
   private static class SampleInfo {
     public final byte[] data;
-    @C.BufferFlags public final int flags;
+    public final @C.BufferFlags int flags;
     public final long timeUs;
 
     public SampleInfo(byte[] data, @C.BufferFlags int flags, long timeUs) {

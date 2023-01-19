@@ -20,7 +20,7 @@ import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.decoder.DecoderInputBuffer;
 import com.google.android.exoplayer2.decoder.SimpleDecoder;
-import com.google.android.exoplayer2.decoder.SimpleOutputBuffer;
+import com.google.android.exoplayer2.decoder.SimpleDecoderOutputBuffer;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.ParsableByteArray;
@@ -30,20 +30,18 @@ import java.util.List;
 
 /** FFmpeg audio decoder. */
 /* package */ final class FfmpegAudioDecoder
-    extends SimpleDecoder<DecoderInputBuffer, SimpleOutputBuffer, FfmpegDecoderException> {
+    extends SimpleDecoder<DecoderInputBuffer, SimpleDecoderOutputBuffer, FfmpegDecoderException> {
 
   // Output buffer sizes when decoding PCM mu-law streams, which is the maximum FFmpeg outputs.
   private static final int OUTPUT_BUFFER_SIZE_16BIT = 65536;
   private static final int OUTPUT_BUFFER_SIZE_32BIT = OUTPUT_BUFFER_SIZE_16BIT * 2;
 
-  // LINT.IfChange
   private static final int AUDIO_DECODER_ERROR_INVALID_DATA = -1;
   private static final int AUDIO_DECODER_ERROR_OTHER = -2;
-  // LINT.ThenChange(../../../../../../../jni/ffmpeg_jni.cc)
 
   private final String codecName;
   @Nullable private final byte[] extraData;
-  private final @C.Encoding int encoding;
+  private final @C.PcmEncoding int encoding;
   private final int outputBufferSize;
 
   private long nativeContext; // May be reassigned on resetting the codec.
@@ -58,7 +56,7 @@ import java.util.List;
       int initialInputBufferSize,
       boolean outputFloat)
       throws FfmpegDecoderException {
-    super(new DecoderInputBuffer[numInputBuffers], new SimpleOutputBuffer[numOutputBuffers]);
+    super(new DecoderInputBuffer[numInputBuffers], new SimpleDecoderOutputBuffer[numOutputBuffers]);
     if (!FfmpegLibrary.isAvailable()) {
       throw new FfmpegDecoderException("Failed to load decoder native libraries.");
     }
@@ -88,8 +86,8 @@ import java.util.List;
   }
 
   @Override
-  protected SimpleOutputBuffer createOutputBuffer() {
-    return new SimpleOutputBuffer(this::releaseOutputBuffer);
+  protected SimpleDecoderOutputBuffer createOutputBuffer() {
+    return new SimpleDecoderOutputBuffer(this::releaseOutputBuffer);
   }
 
   @Override
@@ -98,8 +96,9 @@ import java.util.List;
   }
 
   @Override
-  protected @Nullable FfmpegDecoderException decode(
-      DecoderInputBuffer inputBuffer, SimpleOutputBuffer outputBuffer, boolean reset) {
+  @Nullable
+  protected FfmpegDecoderException decode(
+      DecoderInputBuffer inputBuffer, SimpleDecoderOutputBuffer outputBuffer, boolean reset) {
     if (reset) {
       nativeContext = ffmpegReset(nativeContext, extraData);
       if (nativeContext == 0) {
@@ -159,7 +158,7 @@ import java.util.List;
   }
 
   /** Returns the encoding of output audio. */
-  public @C.Encoding int getEncoding() {
+  public @C.PcmEncoding int getEncoding() {
     return encoding;
   }
 
@@ -167,7 +166,8 @@ import java.util.List;
    * Returns FFmpeg-compatible codec-specific initialization data ("extra data"), or {@code null} if
    * not required.
    */
-  private static @Nullable byte[] getExtraData(String mimeType, List<byte[]> initializationData) {
+  @Nullable
+  private static byte[] getExtraData(String mimeType, List<byte[]> initializationData) {
     switch (mimeType) {
       case MimeTypes.AUDIO_AAC:
       case MimeTypes.AUDIO_OPUS:

@@ -21,6 +21,7 @@ import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.FormatHolder;
 import com.google.android.exoplayer2.SeekParameters;
 import com.google.android.exoplayer2.decoder.DecoderInputBuffer;
+import com.google.android.exoplayer2.source.ClippingMediaSource.IllegalClippingException;
 import com.google.android.exoplayer2.trackselection.ExoTrackSelection;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.MimeTypes;
@@ -42,6 +43,7 @@ public final class ClippingMediaPeriod implements MediaPeriod, MediaPeriod.Callb
   private long pendingInitialDiscontinuityPositionUs;
   /* package */ long startUs;
   /* package */ long endUs;
+  @Nullable private IllegalClippingException clippingError;
 
   /**
    * Creates a new clipping media period that provides a clipped view of the specified {@link
@@ -78,6 +80,16 @@ public final class ClippingMediaPeriod implements MediaPeriod, MediaPeriod.Callb
     this.endUs = endUs;
   }
 
+  /**
+   * Sets a clipping error detected by the media source so that it can be thrown as a period error
+   * at the next opportunity.
+   *
+   * @param clippingError The clipping error.
+   */
+  public void setClippingError(IllegalClippingException clippingError) {
+    this.clippingError = clippingError;
+  }
+
   @Override
   public void prepare(MediaPeriod.Callback callback, long positionUs) {
     this.callback = callback;
@@ -86,6 +98,9 @@ public final class ClippingMediaPeriod implements MediaPeriod, MediaPeriod.Callb
 
   @Override
   public void maybeThrowPrepareError() throws IOException {
+    if (clippingError != null) {
+      throw clippingError;
+    }
     mediaPeriod.maybeThrowPrepareError();
   }
 
@@ -218,6 +233,9 @@ public final class ClippingMediaPeriod implements MediaPeriod, MediaPeriod.Callb
 
   @Override
   public void onPrepared(MediaPeriod mediaPeriod) {
+    if (clippingError != null) {
+      return;
+    }
     Assertions.checkNotNull(callback).onPrepared(this);
   }
 
@@ -299,7 +317,7 @@ public final class ClippingMediaPeriod implements MediaPeriod, MediaPeriod.Callb
 
     @Override
     public int readData(
-        FormatHolder formatHolder, DecoderInputBuffer buffer, boolean requireFormat) {
+        FormatHolder formatHolder, DecoderInputBuffer buffer, @ReadFlags int readFlags) {
       if (isPendingInitialDiscontinuity()) {
         return C.RESULT_NOTHING_READ;
       }
@@ -307,7 +325,7 @@ public final class ClippingMediaPeriod implements MediaPeriod, MediaPeriod.Callb
         buffer.setFlags(C.BUFFER_FLAG_END_OF_STREAM);
         return C.RESULT_BUFFER_READ;
       }
-      @ReadDataResult int result = childStream.readData(formatHolder, buffer, requireFormat);
+      @ReadDataResult int result = childStream.readData(formatHolder, buffer, readFlags);
       if (result == C.RESULT_FORMAT_READ) {
         Format format = Assertions.checkNotNull(formatHolder.format);
         if (format.encoderDelay != 0 || format.encoderPadding != 0) {

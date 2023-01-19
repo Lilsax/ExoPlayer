@@ -17,7 +17,8 @@ package com.google.android.exoplayer2.video;
 
 import static com.google.android.exoplayer2.testutil.FakeSampleStream.FakeSampleStreamItem.END_OF_STREAM_ITEM;
 import static com.google.android.exoplayer2.testutil.FakeSampleStream.FakeSampleStreamItem.oneByteSample;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -33,12 +34,13 @@ import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.Renderer;
 import com.google.android.exoplayer2.RendererCapabilities;
 import com.google.android.exoplayer2.RendererConfiguration;
+import com.google.android.exoplayer2.decoder.CryptoConfig;
 import com.google.android.exoplayer2.decoder.DecoderException;
 import com.google.android.exoplayer2.decoder.DecoderInputBuffer;
 import com.google.android.exoplayer2.decoder.SimpleDecoder;
+import com.google.android.exoplayer2.decoder.VideoDecoderOutputBuffer;
 import com.google.android.exoplayer2.drm.DrmSessionEventListener;
 import com.google.android.exoplayer2.drm.DrmSessionManager;
-import com.google.android.exoplayer2.drm.ExoMediaCrypto;
 import com.google.android.exoplayer2.testutil.FakeSampleStream;
 import com.google.android.exoplayer2.upstream.DefaultAllocator;
 import com.google.android.exoplayer2.util.MimeTypes;
@@ -67,11 +69,13 @@ public final class DecoderVideoRendererTest {
           .setHeight(1080)
           .build();
 
+  private Surface surface;
   private DecoderVideoRenderer renderer;
   @Mock private VideoRendererEventListener eventListener;
 
   @Before
   public void setUp() {
+    surface = new Surface(new SurfaceTexture(/* texName= */ 0));
     renderer =
         new DecoderVideoRenderer(
             /* allowedJoiningTimeMs= */ 0,
@@ -80,7 +84,7 @@ public final class DecoderVideoRendererTest {
             /* maxDroppedFramesToNotify= */ -1) {
 
           private final Phaser inputBuffersInCodecPhaser = new Phaser();
-          @C.VideoOutputMode private int outputMode;
+          private @C.VideoOutputMode int outputMode;
 
           @Override
           public String getName() {
@@ -88,8 +92,7 @@ public final class DecoderVideoRendererTest {
           }
 
           @Override
-          @Capabilities
-          public int supportsFormat(Format format) {
+          public @Capabilities int supportsFormat(Format format) {
             return RendererCapabilities.create(C.FORMAT_HANDLED);
           }
 
@@ -105,7 +108,7 @@ public final class DecoderVideoRendererTest {
           }
 
           @Override
-          protected void onQueueInputBuffer(VideoDecoderInputBuffer buffer) {
+          protected void onQueueInputBuffer(DecoderInputBuffer buffer) {
             // Decoding is done on a background thread we have no control about from the test.
             // Ensure the background calls are predictably serialized by waiting for them to finish:
             //  1. Register queued input buffers here.
@@ -122,17 +125,16 @@ public final class DecoderVideoRendererTest {
 
           @Override
           protected SimpleDecoder<
-                  VideoDecoderInputBuffer,
+                  DecoderInputBuffer,
                   ? extends VideoDecoderOutputBuffer,
                   ? extends DecoderException>
-              createDecoder(Format format, @Nullable ExoMediaCrypto mediaCrypto) {
+              createDecoder(Format format, @Nullable CryptoConfig cryptoConfig) {
             return new SimpleDecoder<
-                VideoDecoderInputBuffer, VideoDecoderOutputBuffer, DecoderException>(
-                new VideoDecoderInputBuffer[10], new VideoDecoderOutputBuffer[10]) {
+                DecoderInputBuffer, VideoDecoderOutputBuffer, DecoderException>(
+                new DecoderInputBuffer[10], new VideoDecoderOutputBuffer[10]) {
               @Override
-              protected VideoDecoderInputBuffer createInputBuffer() {
-                return new VideoDecoderInputBuffer(
-                    DecoderInputBuffer.BUFFER_REPLACEMENT_MODE_DIRECT) {
+              protected DecoderInputBuffer createInputBuffer() {
+                return new DecoderInputBuffer(DecoderInputBuffer.BUFFER_REPLACEMENT_MODE_DIRECT) {
                   @Override
                   public void clear() {
                     super.clear();
@@ -154,7 +156,7 @@ public final class DecoderVideoRendererTest {
               @Nullable
               @Override
               protected DecoderException decode(
-                  VideoDecoderInputBuffer inputBuffer,
+                  DecoderInputBuffer inputBuffer,
                   VideoDecoderOutputBuffer outputBuffer,
                   boolean reset) {
                 outputBuffer.init(inputBuffer.timeUs, outputMode, /* supplementalData= */ null);
@@ -168,17 +170,18 @@ public final class DecoderVideoRendererTest {
             };
           }
         };
-    renderer.setOutputSurface(new Surface(new SurfaceTexture(/* texName= */ 0)));
+    renderer.setOutput(surface);
   }
 
   @After
-  public void shutDown() throws Exception {
+  public void shutDown() {
     if (renderer.getState() == Renderer.STATE_STARTED) {
       renderer.stop();
     }
     if (renderer.getState() == Renderer.STATE_ENABLED) {
       renderer.disable();
     }
+    surface.release();
   }
 
   @Test
@@ -208,7 +211,7 @@ public final class DecoderVideoRendererTest {
       ShadowLooper.idleMainLooper();
     }
 
-    verify(eventListener).onRenderedFirstFrame(any());
+    verify(eventListener).onRenderedFirstFrame(eq(surface), /* renderTimeMs= */ anyLong());
   }
 
   @Test
@@ -239,7 +242,7 @@ public final class DecoderVideoRendererTest {
       ShadowLooper.idleMainLooper();
     }
 
-    verify(eventListener, never()).onRenderedFirstFrame(any());
+    verify(eventListener, never()).onRenderedFirstFrame(eq(surface), /* renderTimeMs= */ anyLong());
   }
 
   @Test
@@ -270,7 +273,7 @@ public final class DecoderVideoRendererTest {
       ShadowLooper.idleMainLooper();
     }
 
-    verify(eventListener).onRenderedFirstFrame(any());
+    verify(eventListener).onRenderedFirstFrame(eq(surface), /* renderTimeMs= */ anyLong());
   }
 
   // TODO: Fix rendering of first frame at stream transition.
@@ -322,7 +325,8 @@ public final class DecoderVideoRendererTest {
       ShadowLooper.idleMainLooper();
     }
 
-    verify(eventListener, times(2)).onRenderedFirstFrame(any());
+    verify(eventListener, times(2))
+        .onRenderedFirstFrame(eq(surface), /* renderTimeMs= */ anyLong());
   }
 
   // TODO: Fix rendering of first frame at stream transition.
@@ -373,11 +377,12 @@ public final class DecoderVideoRendererTest {
       ShadowLooper.idleMainLooper();
     }
 
-    verify(eventListener).onRenderedFirstFrame(any());
+    verify(eventListener).onRenderedFirstFrame(eq(surface), /* renderTimeMs= */ anyLong());
 
     // Render to streamOffsetUs and verify the new first frame gets rendered.
     renderer.render(/* positionUs= */ 100, SystemClock.elapsedRealtime() * 1000);
 
-    verify(eventListener, times(2)).onRenderedFirstFrame(any());
+    verify(eventListener, times(2))
+        .onRenderedFirstFrame(eq(surface), /* renderTimeMs= */ anyLong());
   }
 }

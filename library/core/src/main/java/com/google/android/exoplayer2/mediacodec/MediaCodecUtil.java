@@ -27,12 +27,15 @@ import androidx.annotation.CheckResult;
 import androidx.annotation.GuardedBy;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
+import androidx.annotation.VisibleForTesting;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.Util;
 import com.google.android.exoplayer2.video.ColorInfo;
+import com.google.common.base.Ascii;
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -41,16 +44,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.checkerframework.checker.nullness.qual.EnsuresNonNull;
 
-/**
- * A utility class for querying the available codecs.
- */
+/** A utility class for querying the available codecs. */
 @SuppressLint("InlinedApi")
 public final class MediaCodecUtil {
 
   /**
    * Thrown when an error occurs querying the device for its underlying media capabilities.
-   * <p>
-   * Such failures are not expected in normal operation and are normally temporary (e.g. if the
+   *
+   * <p>Such failures are not expected in normal operation and are normally temporary (e.g. if the
    * mediaserver process has crashed and is yet to restart).
    */
   public static class DecoderQueryException extends Exception {
@@ -58,7 +59,6 @@ public final class MediaCodecUtil {
     private DecoderQueryException(Throwable cause) {
       super("Failed to query underlying media codecs", cause);
     }
-
   }
 
   private static final String TAG = "MediaCodecUtil";
@@ -107,11 +107,8 @@ public final class MediaCodecUtil {
     }
   }
 
-  /**
-   * Clears the codec cache.
-   *
-   * <p>This method should only be called in tests.
-   */
+  /* Clears the codec cache.*/
+  @VisibleForTesting
   public static synchronized void clearDecoderInfoCache() {
     decoderInfosCache.clear();
   }
@@ -145,7 +142,7 @@ public final class MediaCodecUtil {
     return decoderInfos.isEmpty() ? null : decoderInfos.get(0);
   }
 
-  /*
+  /**
    * Returns all {@link MediaCodecInfo}s for the given mime type, in the order given by {@link
    * MediaCodecList}.
    *
@@ -176,14 +173,18 @@ public final class MediaCodecUtil {
       mediaCodecList = new MediaCodecListCompatV16();
       decoderInfos = getDecoderInfosInternal(key, mediaCodecList);
       if (!decoderInfos.isEmpty()) {
-        Log.w(TAG, "MediaCodecList API didn't list secure decoder for: " + mimeType
-            + ". Assuming: " + decoderInfos.get(0).name);
+        Log.w(
+            TAG,
+            "MediaCodecList API didn't list secure decoder for: "
+                + mimeType
+                + ". Assuming: "
+                + decoderInfos.get(0).name);
       }
     }
     applyWorkarounds(mimeType, decoderInfos);
-    List<MediaCodecInfo> unmodifiableDecoderInfos = Collections.unmodifiableList(decoderInfos);
-    decoderInfosCache.put(key, unmodifiableDecoderInfos);
-    return unmodifiableDecoderInfos;
+    ImmutableList<MediaCodecInfo> immutableDecoderInfos = ImmutableList.copyOf(decoderInfos);
+    decoderInfosCache.put(key, immutableDecoderInfos);
+    return immutableDecoderInfos;
   }
 
   /**
@@ -266,6 +267,41 @@ public final class MediaCodecUtil {
     }
   }
 
+  /**
+   * Returns an alternative codec MIME type (besides the default {@link Format#sampleMimeType}) that
+   * can be used to decode samples of the provided {@link Format}.
+   *
+   * @param format The media format.
+   * @return An alternative MIME type of a codec that be used decode samples of the provided {@code
+   *     Format} (besides the default {@link Format#sampleMimeType}), or null if no such alternative
+   *     exists.
+   */
+  @Nullable
+  public static String getAlternativeCodecMimeType(Format format) {
+    if (MimeTypes.AUDIO_E_AC3_JOC.equals(format.sampleMimeType)) {
+      // E-AC3 decoders can decode JOC streams, but in 2-D rather than 3-D.
+      return MimeTypes.AUDIO_E_AC3;
+    }
+    if (MimeTypes.VIDEO_DOLBY_VISION.equals(format.sampleMimeType)) {
+      // H.264/AVC or H.265/HEVC decoders can decode the base layer of some DV profiles. This can't
+      // be done for profile CodecProfileLevel.DolbyVisionProfileDvheStn and profile
+      // CodecProfileLevel.DolbyVisionProfileDvheDtb because the first one is not backward
+      // compatible and the second one is deprecated and is not always backward compatible.
+      @Nullable
+      Pair<Integer, Integer> codecProfileAndLevel = MediaCodecUtil.getCodecProfileAndLevel(format);
+      if (codecProfileAndLevel != null) {
+        int profile = codecProfileAndLevel.first;
+        if (profile == CodecProfileLevel.DolbyVisionProfileDvheDtr
+            || profile == CodecProfileLevel.DolbyVisionProfileDvheSt) {
+          return MimeTypes.VIDEO_H265;
+        } else if (profile == CodecProfileLevel.DolbyVisionProfileDvavSe) {
+          return MimeTypes.VIDEO_H264;
+        }
+      }
+    }
+    return null;
+  }
+
   // Internal methods.
 
   /**
@@ -320,8 +356,8 @@ public final class MediaCodecUtil {
           if ((!key.secure && secureRequired) || (key.secure && !secureSupported)) {
             continue;
           }
-          boolean hardwareAccelerated = isHardwareAccelerated(codecInfo);
-          boolean softwareOnly = isSoftwareOnly(codecInfo);
+          boolean hardwareAccelerated = isHardwareAccelerated(codecInfo, mimeType);
+          boolean softwareOnly = isSoftwareOnly(codecInfo, mimeType);
           boolean vendor = isVendor(codecInfo);
           if ((secureDecodersExplicit && key.secure == secureSupported)
               || (!secureDecodersExplicit && !key.secure)) {
@@ -384,9 +420,7 @@ public final class MediaCodecUtil {
    */
   @Nullable
   private static String getCodecMimeType(
-      android.media.MediaCodecInfo info,
-      String name,
-      String mimeType) {
+      android.media.MediaCodecInfo info, String name, String mimeType) {
     String[] supportedTypes = info.getSupportedTypes();
     for (String supportedType : supportedTypes) {
       if (supportedType.equalsIgnoreCase(mimeType)) {
@@ -407,6 +441,8 @@ public final class MediaCodecUtil {
       return "audio/x-lg-alac";
     } else if (mimeType.equals(MimeTypes.AUDIO_FLAC) && "OMX.lge.flac.decoder".equals(name)) {
       return "audio/x-lg-flac";
+    } else if (mimeType.equals(MimeTypes.AUDIO_AC3) && "OMX.lge.ac3.decoder".equals(name)) {
+      return "audio/lg-ac3";
     }
 
     return null;
@@ -508,13 +544,16 @@ public final class MediaCodecUtil {
     }
 
     // VP8 decoder on Samsung Galaxy S4 cannot be queried.
-    if (Util.SDK_INT <= 19 && Util.DEVICE.startsWith("jflte")
+    if (Util.SDK_INT <= 19
+        && Util.DEVICE.startsWith("jflte")
         && "OMX.qcom.video.decoder.vp8".equals(name)) {
       return false;
     }
 
-    // MTK E-AC3 decoder doesn't support decoding JOC streams in 2-D. See [Internal: b/69400041].
-    if (MimeTypes.AUDIO_E_AC3_JOC.equals(mimeType) && "OMX.MTK.AUDIO.DECODER.DSPAC3".equals(name)) {
+    // MTK AC3 decoder doesn't support decoding JOC streams in 2-D. See [Internal: b/69400041].
+    if (Util.SDK_INT <= 23
+        && MimeTypes.AUDIO_E_AC3_JOC.equals(mimeType)
+        && "OMX.MTK.AUDIO.DECODER.DSPAC3".equals(name)) {
       return false;
     }
 
@@ -579,10 +618,10 @@ public final class MediaCodecUtil {
       }
     }
 
-    if (Util.SDK_INT < 30 && decoderInfos.size() > 1) {
+    if (Util.SDK_INT < 32 && decoderInfos.size() > 1) {
       String firstCodecName = decoderInfos.get(0).name;
       // Prefer anything other than OMX.qti.audio.decoder.flac on older devices. See [Internal
-      // ref: b/147278539] and [Internal ref: b/147354613].
+      // ref: b/199124812].
       if ("OMX.qti.audio.decoder.flac".equals(firstCodecName)) {
         decoderInfos.add(decoderInfos.remove(0));
       }
@@ -602,13 +641,14 @@ public final class MediaCodecUtil {
    * The result of {@link android.media.MediaCodecInfo#isHardwareAccelerated()} for API levels 29+,
    * or a best-effort approximation for lower levels.
    */
-  private static boolean isHardwareAccelerated(android.media.MediaCodecInfo codecInfo) {
+  private static boolean isHardwareAccelerated(
+      android.media.MediaCodecInfo codecInfo, String mimeType) {
     if (Util.SDK_INT >= 29) {
       return isHardwareAcceleratedV29(codecInfo);
     }
     // codecInfo.isHardwareAccelerated() != codecInfo.isSoftwareOnly() is not necessarily true.
     // However, we assume this to be true as an approximation.
-    return !isSoftwareOnly(codecInfo);
+    return !isSoftwareOnly(codecInfo, mimeType);
   }
 
   @RequiresApi(29)
@@ -620,12 +660,17 @@ public final class MediaCodecUtil {
    * The result of {@link android.media.MediaCodecInfo#isSoftwareOnly()} for API levels 29+, or a
    * best-effort approximation for lower levels.
    */
-  private static boolean isSoftwareOnly(android.media.MediaCodecInfo codecInfo) {
+  private static boolean isSoftwareOnly(android.media.MediaCodecInfo codecInfo, String mimeType) {
     if (Util.SDK_INT >= 29) {
       return isSoftwareOnlyV29(codecInfo);
     }
-    String codecName = Util.toLowerInvariant(codecInfo.getName());
-    if (codecName.startsWith("arc.")) { // App Runtime for Chrome (ARC) codecs
+    if (MimeTypes.isAudio(mimeType)) {
+      // Assume audio decoders are software only.
+      return true;
+    }
+    String codecName = Ascii.toLowerCase(codecInfo.getName());
+    if (codecName.startsWith("arc.")) {
+      // App Runtime for Chrome (ARC) codecs
       return false;
     }
     return codecName.startsWith("omx.google.")
@@ -650,7 +695,7 @@ public final class MediaCodecUtil {
     if (Util.SDK_INT >= 29) {
       return isVendorV29(codecInfo);
     }
-    String codecName = Util.toLowerInvariant(codecInfo.getName());
+    String codecName = Ascii.toLowerCase(codecInfo.getName());
     return !codecName.startsWith("omx.google.")
         && !codecName.startsWith("c2.android.")
         && !codecName.startsWith("c2.google.");
@@ -842,9 +887,9 @@ public final class MediaCodecUtil {
   /**
    * Conversion values taken from ISO 14496-10 Table A-1.
    *
-   * @param avcLevel one of CodecProfileLevel.AVCLevel* constants.
-   * @return maximum frame size that can be decoded by a decoder with the specified avc level
-   *     (or {@code -1} if the level is not recognized)
+   * @param avcLevel One of the {@link CodecProfileLevel} {@code AVCLevel*} constants.
+   * @return The maximum frame size that can be decoded by a decoder with the specified AVC level,
+   *     or {@code -1} if the level is not recognized.
    */
   private static int avcLevelToMaxFrameSize(int avcLevel) {
     switch (avcLevel) {
@@ -874,6 +919,10 @@ public final class MediaCodecUtil {
       case CodecProfileLevel.AVCLevel51:
       case CodecProfileLevel.AVCLevel52:
         return 36864 * 16 * 16;
+      case CodecProfileLevel.AVCLevel6:
+      case CodecProfileLevel.AVCLevel61:
+      case CodecProfileLevel.AVCLevel62:
+        return 139264 * 16 * 16;
       default:
         return -1;
     }
@@ -917,9 +966,7 @@ public final class MediaCodecUtil {
 
   private interface MediaCodecListCompat {
 
-    /**
-     * The number of codecs in the list.
-     */
+    /** The number of codecs in the list. */
     int getCodecCount();
 
     /**
@@ -929,9 +976,7 @@ public final class MediaCodecUtil {
      */
     android.media.MediaCodecInfo getCodecInfoAt(int index);
 
-    /**
-     * Returns whether secure decoders are explicitly listed, if present.
-     */
+    /** Returns whether secure decoders are explicitly listed, if present. */
     boolean secureDecodersExplicit();
 
     /** Whether the specified {@link CodecCapabilities} {@code feature} is supported. */
@@ -990,7 +1035,6 @@ public final class MediaCodecUtil {
         mediaCodecInfos = new MediaCodecList(codecKind).getCodecInfos();
       }
     }
-
   }
 
   private static final class MediaCodecListCompatV16 implements MediaCodecListCompat {
@@ -1024,7 +1068,6 @@ public final class MediaCodecUtil {
         String feature, String mimeType, CodecCapabilities capabilities) {
       return false;
     }
-
   }
 
   private static final class CodecKey {
