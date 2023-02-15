@@ -17,6 +17,7 @@ package com.google.android.exoplayer2.source.dash;
 
 import static java.lang.Math.min;
 
+import android.util.Log;
 import android.util.Pair;
 import android.util.SparseArray;
 import android.util.SparseIntArray;
@@ -441,6 +442,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
         // Update selection in existing stream.
         @SuppressWarnings("unchecked")
         ChunkSampleStream<DashChunkSource> stream = (ChunkSampleStream<DashChunkSource>) streams[i];
+        Log.d("sleman", "selection.length() " + selection.length());
         stream.getChunkSource().updateTrackSelection(selection);
       }
     }
@@ -762,6 +764,8 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
         manifest.dynamic && enableEventMessageTrack
             ? playerEmsgHandler.newPlayerTrackEmsgHandler()
             : null;
+
+    Log.d("sleman", "trackGroupInfo.adaptationSetIndices.length :- " + trackGroupInfo.adaptationSetIndices.length );
     DashChunkSource chunkSource =
         chunkSourceFactory.createDashChunkSource(
             manifestLoaderErrorThrower,

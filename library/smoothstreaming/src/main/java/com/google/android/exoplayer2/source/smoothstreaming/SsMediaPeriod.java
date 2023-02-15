@@ -15,6 +15,7 @@
  */
 package com.google.android.exoplayer2.source.smoothstreaming;
 
+import android.util.Log;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
@@ -137,6 +138,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
           stream.release();
           streams[i] = null;
         } else {
+          Log.d("sleman", "selections : - "  + selections[i].length());
           stream.getChunkSource().updateTrackSelection(selections[i]);
           sampleStreamsList.add(stream);
         }
