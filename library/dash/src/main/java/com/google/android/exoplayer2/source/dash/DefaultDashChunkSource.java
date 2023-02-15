@@ -218,7 +218,13 @@ public class DefaultDashChunkSource implements DashChunkSource {
       long periodDurationUs = manifest.getPeriodDurationUs(periodIndex);
       List<Representation> representations = getRepresentations();
       for (int i = 0; i < representationHolders.length; i++) {
-        Representation representation = representations.get(trackSelection.getIndexInTrackGroup(i));
+        int trackIndex = trackSelection.getIndexInTrackGroup(i);
+        
+        if(trackIndex >= representations.size()) {
+          continue;
+        }
+
+        Representation representation = representations.get(trackIndex);
         representationHolders[i] =
             representationHolders[i].copyWithNewRepresentation(periodDurationUs, representation);
       }
