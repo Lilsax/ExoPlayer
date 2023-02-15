@@ -231,8 +231,11 @@ public class DefaultDashChunkSource implements DashChunkSource {
         Log.d("sleman", "i" + i);
         Representation representation = representations.get(trackSelection.getIndexInTrackGroup(i));
         Log.d("sleman", "representation ;- " + representation.toString());
+        Log.d("sleman", "representation getIndex ;- " + representation.getIndex());
+
         representationHolders[i] =
             representationHolders[i].copyWithNewRepresentation(periodDurationUs, representation);
+        Log.d("sleman", " @@@@@@@@@@@@@@@@@@@@ END @@@@@@@@@@@@@@@@@@");
       }
     } catch (BehindLiveWindowException e) {
             Log.d("sleman", "e + " + e);
@@ -492,6 +495,7 @@ public class DefaultDashChunkSource implements DashChunkSource {
   }
 
   private ArrayList<Representation> getRepresentations() {
+    Log.d("sleman", "periodIndex :- " + periodIndex);
     List<AdaptationSet> manifestAdaptationSets = manifest.getPeriod(periodIndex).adaptationSets;
     ArrayList<Representation> representations = new ArrayList<>();
     for (int adaptationSetIndex : adaptationSetIndices) {
@@ -719,17 +723,24 @@ public class DefaultDashChunkSource implements DashChunkSource {
       DashSegmentIndex oldIndex = representation.getIndex();
       DashSegmentIndex newIndex = newRepresentation.getIndex();
 
+      Log.d("sleman", "oldIndex ;- " + oldIndex.toString());
+      Log.d("sleman", "newIndex ;- " + newIndex.toString());
+      Log.d("sleman", "0");
+
       if (oldIndex == null) {
         // Segment numbers cannot shift if the index isn't defined by the manifest.
         return new RepresentationHolder(
             newPeriodDurationUs, newRepresentation, chunkExtractor, segmentNumShift, oldIndex);
       }
 
+      Log.d("sleman", "1");
+
       if (!oldIndex.isExplicit()) {
         // Segment numbers cannot shift if the index isn't explicit.
         return new RepresentationHolder(
             newPeriodDurationUs, newRepresentation, chunkExtractor, segmentNumShift, newIndex);
       }
+      Log.d("sleman", "2");
 
       int oldIndexSegmentCount = oldIndex.getSegmentCount(newPeriodDurationUs);
       if (oldIndexSegmentCount == 0) {
@@ -737,6 +748,8 @@ public class DefaultDashChunkSource implements DashChunkSource {
         return new RepresentationHolder(
             newPeriodDurationUs, newRepresentation, chunkExtractor, segmentNumShift, newIndex);
       }
+
+      Log.d("sleman", "3");
 
       long oldIndexFirstSegmentNum = oldIndex.getFirstSegmentNum();
       long oldIndexStartTimeUs = oldIndex.getTimeUs(oldIndexFirstSegmentNum);
@@ -766,6 +779,8 @@ public class DefaultDashChunkSource implements DashChunkSource {
             oldIndex.getSegmentNum(newIndexStartTimeUs, newPeriodDurationUs)
                 - newIndexFirstSegmentNum;
       }
+      Log.d("sleman", "3");
+
       return new RepresentationHolder(
           newPeriodDurationUs, newRepresentation, chunkExtractor, newSegmentNumShift, newIndex);
     }
