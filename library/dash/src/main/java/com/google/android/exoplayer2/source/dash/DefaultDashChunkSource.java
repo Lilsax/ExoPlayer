@@ -175,12 +175,12 @@ public class DefaultDashChunkSource implements DashChunkSource {
     long periodDurationUs = manifest.getPeriodDurationUs(periodIndex);
 
     List<Representation> representations = getRepresentations();
-    Log.d("sleman", "trackSelection.length() :- " + trackSelection.length());
+    Log.d("sleman", "LKMASDJASDJASDJAS trackSelection.length() :- " + trackSelection.length());
     representationHolders = new RepresentationHolder[trackSelection.length()];
     for (int i = 0; i < representationHolders.length; i++) {
-      Log.d("sleman", "trackSelection.getIndexInTrackGroup" + trackSelection.getIndexInTrackGroup(i));
+      Log.d("sleman", "POOOOPP  trackSelection.getIndexInTrackGroup" + trackSelection.getIndexInTrackGroup(i));
       Representation representation = representations.get(trackSelection.getIndexInTrackGroup(i));
-      Log.d("sleman", "representation.getIndex() :- " + representation.getIndex());
+      Log.d("sleman", "POASDSAD representation.getIndex() :- " + representation.getIndex());
       representationHolders[i] =
           new RepresentationHolder(
               periodDurationUs,
@@ -221,7 +221,7 @@ public class DefaultDashChunkSource implements DashChunkSource {
       periodIndex = newPeriodIndex;
 
 
-      Log.d("sleman", " periodIndex :- " + periodIndex );
+      Log.d("sleman", " asd periodIndex :- " + periodIndex );
       Log.d("sleman", "getPeriodCount() " + newManifest.getPeriodCount());
       long periodDurationUs = manifest.getPeriodDurationUs(periodIndex);
       Log.d("sleman", "periodDurationUs " + periodDurationUs);

@@ -765,7 +765,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
             ? playerEmsgHandler.newPlayerTrackEmsgHandler()
             : null;
 
-    Log.d("sleman", "trackGroupInfo.adaptationSetIndices.length :- " + trackGroupInfo.adaptationSetIndices.length );
+    Log.d("sleman", "WWW selection.length() :- " + selection.length() );
     DashChunkSource chunkSource =
         chunkSourceFactory.createDashChunkSource(
             manifestLoaderErrorThrower,
