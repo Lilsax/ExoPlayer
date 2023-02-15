@@ -240,9 +240,9 @@ public class DefaultDashChunkSource implements DashChunkSource {
         Log.d("sleman", "representations.size()321" + representations.get(0).revisionId);
         Log.d("sleman", "representations.size() 132" + representations.get(0).baseUrl);
         Log.d("sleman", "representations.size()312" + representations.get(0).format);
-        Log.d("sleman", "representations.size()231" + representations.get(representations.size()).revisionId);
-        Log.d("sleman", "representations.size()213" + representations.get(representations.size()).baseUrl);
-        Log.d("sleman", "representations.size()221" + representations.get(representations.size()).format);
+        Log.d("sleman", "representations.size()231" + representations.get(representations.size() - 1).revisionId);
+        Log.d("sleman", "representations.size()213" + representations.get(representations.size() - 1 ).baseUrl);
+        Log.d("sleman", "representations.size()221" + representations.get(representations.size() - 1).format);
 
         Representation representation = representations.get(trackSelection.getIndexInTrackGroup(i));
         Log.d("sleman", "representation ;- " + representation.toString());
