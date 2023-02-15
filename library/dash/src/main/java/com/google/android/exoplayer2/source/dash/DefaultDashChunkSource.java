@@ -180,7 +180,10 @@ public class DefaultDashChunkSource implements DashChunkSource {
     for (int i = 0; i < representationHolders.length; i++) {
       Log.d("sleman", "POOOOPP  trackSelection.getIndexInTrackGroup" + trackSelection.getIndexInTrackGroup(i));
       Representation representation = representations.get(trackSelection.getIndexInTrackGroup(i));
-      Log.d("sleman", "POASDSAD representation.getIndex() :- " + representation.getIndex());
+      Log.d("sleman", "POASDSAD representation.format :- " + representation.format);
+      Log.d("sleman", "POASDSAD representation.baseUrl :- " + representation.baseUrl);
+      Log.d("sleman", "POASDSAD representation.revisionId :- " + representation.revisionId);
+
       representationHolders[i] =
           new RepresentationHolder(
               periodDurationUs,
@@ -233,7 +236,14 @@ public class DefaultDashChunkSource implements DashChunkSource {
       for (int i = 0; i < representationHolders.length; i++) {
         Log.d("sleman", "i" + i);
         Log.d("sleman", "trackSelection.getIndexInTrackGroup(i) " + trackSelection.getIndexInTrackGroup(i));
-        Log.d("sleman", "representations.size()" + representations.size());
+        Log.d("sleman", "representations.size() 123 " + representations.size());
+        Log.d("sleman", "representations.size()321" + representations.get(0).revisionId);
+        Log.d("sleman", "representations.size() 132" + representations.get(0).baseUrl);
+        Log.d("sleman", "representations.size()312" + representations.get(0).format);
+        Log.d("sleman", "representations.size()231" + representations.get(representations.size()).revisionId);
+        Log.d("sleman", "representations.size()213" + representations.get(representations.size()).baseUrl);
+        Log.d("sleman", "representations.size()221" + representations.get(representations.size()).format);
+
         Representation representation = representations.get(trackSelection.getIndexInTrackGroup(i));
         Log.d("sleman", "representation ;- " + representation.toString());
         Log.d("sleman", "representation getIndex ;- " + representation.getIndex());
