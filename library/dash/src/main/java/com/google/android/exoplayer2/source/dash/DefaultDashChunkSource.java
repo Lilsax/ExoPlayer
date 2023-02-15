@@ -220,6 +220,13 @@ public class DefaultDashChunkSource implements DashChunkSource {
       long periodDurationUs = manifest.getPeriodDurationUs(periodIndex);
       List<Representation> representations = getRepresentations();
       for (int i = 0; i < representationHolders.length; i++) {
+        Log.d("sleman", "trackSelection.getIndexInTrackGroup(i) "+ trackSelection.getIndexInTrackGroup(i));
+        Log.d("sleman", "representations.size() "+ representations.size());
+
+        for(int w = 1; w < representations.size(); w++) {
+          Log.d("sleman", "format" + representations.get(w).format);
+        }
+
         int trackIndex = trackSelection.getIndexInTrackGroup(i);
         if(trackIndex >= representations.size()) {
           continue;
@@ -489,6 +496,18 @@ public class DefaultDashChunkSource implements DashChunkSource {
     for (int adaptationSetIndex : adaptationSetIndices) {
       representations.addAll(manifestAdaptationSets.get(adaptationSetIndex).representations);
     }
+
+    for(int i =0; i < manifestAdaptationSets.size(); i++ ) {
+
+      for(int j = 0; j < manifestAdaptationSets.get(i).representations.size(); j ++) {
+        Log.d("sleman" , "anta m3lm :- " + manifestAdaptationSets.get(i).representations.get(j).format);
+      }
+    }
+
+    for(int e =0;  e < representations.size(); e++ ) {
+      Log.d("sleman", "stars " + representations.get(e).format);
+    }
+
     return representations;
   }
 
