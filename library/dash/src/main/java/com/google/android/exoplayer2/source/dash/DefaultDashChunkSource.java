@@ -221,7 +221,7 @@ public class DefaultDashChunkSource implements DashChunkSource {
       List<Representation> representations = getRepresentations();
       for (int i = 0; i < representationHolders.length; i++) {
         int trackIndex = trackSelection.getIndexInTrackGroup(i);
-        if(trackIndex == representations.size()) {
+        if(trackIndex >= representations.size()) {
           continue;
         }
         Representation representation = representations.get(trackIndex);
