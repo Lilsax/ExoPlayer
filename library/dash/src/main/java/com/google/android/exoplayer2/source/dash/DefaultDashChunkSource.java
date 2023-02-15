@@ -228,7 +228,9 @@ public class DefaultDashChunkSource implements DashChunkSource {
       Log.d("sleman", "representationHolders.length " + representationHolders.length);
 
       for (int i = 0; i < representationHolders.length; i++) {
+        Log.d("sleman", "i" + i);
         Representation representation = representations.get(trackSelection.getIndexInTrackGroup(i));
+        Log.d("sleman", "representation ;- " + representation.toString());
         representationHolders[i] =
             representationHolders[i].copyWithNewRepresentation(periodDurationUs, representation);
       }
@@ -495,6 +497,7 @@ public class DefaultDashChunkSource implements DashChunkSource {
     for (int adaptationSetIndex : adaptationSetIndices) {
       representations.addAll(manifestAdaptationSets.get(adaptationSetIndex).representations);
     }
+    Log.d("sleman", "representations length :- " + representations.size());
     return representations;
   }
 
