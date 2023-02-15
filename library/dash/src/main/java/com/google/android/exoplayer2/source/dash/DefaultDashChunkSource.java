@@ -229,6 +229,8 @@ public class DefaultDashChunkSource implements DashChunkSource {
 
       for (int i = 0; i < representationHolders.length; i++) {
         Log.d("sleman", "i" + i);
+        Log.d("sleman", "trackSelection.getIndexInTrackGroup(i) " + trackSelection.getIndexInTrackGroup(i));
+        Log.d("sleman", "representations.size()" + representations.size());
         Representation representation = representations.get(trackSelection.getIndexInTrackGroup(i));
         Log.d("sleman", "representation ;- " + representation.toString());
         Log.d("sleman", "representation getIndex ;- " + representation.getIndex());
