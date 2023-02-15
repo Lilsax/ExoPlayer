@@ -215,7 +215,15 @@ public class DefaultDashChunkSource implements DashChunkSource {
     try {
       manifest = newManifest;
       periodIndex = newPeriodIndex;
+
+
+      Log.d("sleman", " periodIndex :- " + periodIndex );
+      Log.d("sleman", "getPeriodCount() " + dashManifest.getPeriodCount());
       long periodDurationUs = manifest.getPeriodDurationUs(periodIndex);
+      Log.d("sleman", "periodDurationUs " + periodDurationUs);
+      Log.d("sleman", "representationHolders", representationHolders.toString());
+      Log.d("sleman", "representationHolders.length", representationHolders.length);
+
       List<Representation> representations = getRepresentations();
       for (int i = 0; i < representationHolders.length; i++) {
         Representation representation = representations.get(trackSelection.getIndexInTrackGroup(i));
@@ -223,6 +231,8 @@ public class DefaultDashChunkSource implements DashChunkSource {
             representationHolders[i].copyWithNewRepresentation(periodDurationUs, representation);
       }
     } catch (BehindLiveWindowException e) {
+            Log.d("sleman", "e + " + e);
+
       fatalError = e;
     }
   }
