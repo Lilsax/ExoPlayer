@@ -20,6 +20,7 @@ import static java.lang.Math.min;
 
 import android.net.Uri;
 import android.os.SystemClock;
+import android.util.Log;
 import androidx.annotation.CheckResult;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
@@ -218,13 +219,14 @@ public class DefaultDashChunkSource implements DashChunkSource {
 
 
       Log.d("sleman", " periodIndex :- " + periodIndex );
-      Log.d("sleman", "getPeriodCount() " + dashManifest.getPeriodCount());
+      Log.d("sleman", "getPeriodCount() " + newManifest.getPeriodCount());
       long periodDurationUs = manifest.getPeriodDurationUs(periodIndex);
       Log.d("sleman", "periodDurationUs " + periodDurationUs);
-      Log.d("sleman", "representationHolders", representationHolders.toString());
-      Log.d("sleman", "representationHolders.length", representationHolders.length);
 
       List<Representation> representations = getRepresentations();
+      Log.d("sleman", "representationHolders" + representationHolders.toString());
+      Log.d("sleman", "representationHolders.length " + representationHolders.length);
+
       for (int i = 0; i < representationHolders.length; i++) {
         Representation representation = representations.get(trackSelection.getIndexInTrackGroup(i));
         representationHolders[i] =
