@@ -175,15 +175,9 @@ public class DefaultDashChunkSource implements DashChunkSource {
     long periodDurationUs = manifest.getPeriodDurationUs(periodIndex);
 
     List<Representation> representations = getRepresentations();
-    Log.d("sleman", "LKMASDJASDJASDJAS trackSelection.length() :- " + trackSelection.length());
     representationHolders = new RepresentationHolder[trackSelection.length()];
     for (int i = 0; i < representationHolders.length; i++) {
-      Log.d("sleman", "POOOOPP  trackSelection.getIndexInTrackGroup" + trackSelection.getIndexInTrackGroup(i));
       Representation representation = representations.get(trackSelection.getIndexInTrackGroup(i));
-      Log.d("sleman", "POASDSAD representation.format :- " + representation.format);
-      Log.d("sleman", "POASDSAD representation.baseUrl :- " + representation.baseUrl);
-      Log.d("sleman", "POASDSAD representation.revisionId :- " + representation.revisionId);
-
       representationHolders[i] =
           new RepresentationHolder(
               periodDurationUs,
@@ -223,38 +217,21 @@ public class DefaultDashChunkSource implements DashChunkSource {
       manifest = newManifest;
       periodIndex = newPeriodIndex;
 
-
-      Log.d("sleman", " asd periodIndex :- " + periodIndex );
-      Log.d("sleman", "getPeriodCount() " + newManifest.getPeriodCount());
       long periodDurationUs = manifest.getPeriodDurationUs(periodIndex);
-      Log.d("sleman", "periodDurationUs " + periodDurationUs);
-
       List<Representation> representations = getRepresentations();
-      Log.d("sleman", "representationHolders" + representationHolders.toString());
-      Log.d("sleman", "representationHolders.length " + representationHolders.length);
-
       for (int i = 0; i < representationHolders.length; i++) {
-        Log.d("sleman", "i" + i);
-        Log.d("sleman", "trackSelection.getIndexInTrackGroup(i) " + trackSelection.getIndexInTrackGroup(i));
-        Log.d("sleman", "representations.size() 123 " + representations.size());
-        Log.d("sleman", "representations.size()321" + representations.get(0).revisionId);
-        Log.d("sleman", "representations.size() 132" + representations.get(0).baseUrl);
-        Log.d("sleman", "representations.size()312" + representations.get(0).format);
-        Log.d("sleman", "representations.size()231" + representations.get(representations.size() - 1).revisionId);
-        Log.d("sleman", "representations.size()213" + representations.get(representations.size() - 1 ).baseUrl);
-        Log.d("sleman", "representations.size()221" + representations.get(representations.size() - 1).format);
+        int trackIndex = trackSelection.getIndexInTrackGroup(i);
+        if(trackIndex == representations.size()) {
+          Log.d("sleman", "1" + representations.size());
+          Log.d("sleman", "2" + trackSelection.getIndexInTrackGroup(i));
 
-        Representation representation = representations.get(trackSelection.getIndexInTrackGroup(i));
-        Log.d("sleman", "representation ;- " + representation.toString());
-        Log.d("sleman", "representation getIndex ;- " + representation.getIndex());
-
+          trackIndex = representations.size() - 1;
+        }
+        Representation representation = representations.get(trackIndex);
         representationHolders[i] =
             representationHolders[i].copyWithNewRepresentation(periodDurationUs, representation);
-        Log.d("sleman", " @@@@@@@@@@@@@@@@@@@@ END @@@@@@@@@@@@@@@@@@");
       }
     } catch (BehindLiveWindowException e) {
-            Log.d("sleman", "e + " + e);
-
       fatalError = e;
     }
   }
@@ -510,13 +487,11 @@ public class DefaultDashChunkSource implements DashChunkSource {
   }
 
   private ArrayList<Representation> getRepresentations() {
-    Log.d("sleman", "periodIndex :- " + periodIndex);
     List<AdaptationSet> manifestAdaptationSets = manifest.getPeriod(periodIndex).adaptationSets;
     ArrayList<Representation> representations = new ArrayList<>();
     for (int adaptationSetIndex : adaptationSetIndices) {
       representations.addAll(manifestAdaptationSets.get(adaptationSetIndex).representations);
     }
-    Log.d("sleman", "representations length :- " + representations.size());
     return representations;
   }
 
@@ -738,33 +713,23 @@ public class DefaultDashChunkSource implements DashChunkSource {
       DashSegmentIndex oldIndex = representation.getIndex();
       DashSegmentIndex newIndex = newRepresentation.getIndex();
 
-      Log.d("sleman", "oldIndex ;- " + oldIndex.toString());
-      Log.d("sleman", "newIndex ;- " + newIndex.toString());
-      Log.d("sleman", "0");
-
       if (oldIndex == null) {
         // Segment numbers cannot shift if the index isn't defined by the manifest.
         return new RepresentationHolder(
             newPeriodDurationUs, newRepresentation, chunkExtractor, segmentNumShift, oldIndex);
       }
 
-      Log.d("sleman", "1");
-
       if (!oldIndex.isExplicit()) {
         // Segment numbers cannot shift if the index isn't explicit.
         return new RepresentationHolder(
             newPeriodDurationUs, newRepresentation, chunkExtractor, segmentNumShift, newIndex);
       }
-      Log.d("sleman", "2");
-
       int oldIndexSegmentCount = oldIndex.getSegmentCount(newPeriodDurationUs);
       if (oldIndexSegmentCount == 0) {
         // Segment numbers cannot shift if the old index was empty.
         return new RepresentationHolder(
             newPeriodDurationUs, newRepresentation, chunkExtractor, segmentNumShift, newIndex);
       }
-
-      Log.d("sleman", "3");
 
       long oldIndexFirstSegmentNum = oldIndex.getFirstSegmentNum();
       long oldIndexStartTimeUs = oldIndex.getTimeUs(oldIndexFirstSegmentNum);
@@ -794,8 +759,6 @@ public class DefaultDashChunkSource implements DashChunkSource {
             oldIndex.getSegmentNum(newIndexStartTimeUs, newPeriodDurationUs)
                 - newIndexFirstSegmentNum;
       }
-      Log.d("sleman", "3");
-
       return new RepresentationHolder(
           newPeriodDurationUs, newRepresentation, chunkExtractor, newSegmentNumShift, newIndex);
     }

@@ -442,7 +442,6 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
         // Update selection in existing stream.
         @SuppressWarnings("unchecked")
         ChunkSampleStream<DashChunkSource> stream = (ChunkSampleStream<DashChunkSource>) streams[i];
-        Log.d("sleman", "selection.length() " + selection.length());
         stream.getChunkSource().updateTrackSelection(selection);
       }
     }
@@ -765,7 +764,6 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
             ? playerEmsgHandler.newPlayerTrackEmsgHandler()
             : null;
 
-    Log.d("sleman", "WWW selection.length() :- " + selection.length() );
     DashChunkSource chunkSource =
         chunkSourceFactory.createDashChunkSource(
             manifestLoaderErrorThrower,

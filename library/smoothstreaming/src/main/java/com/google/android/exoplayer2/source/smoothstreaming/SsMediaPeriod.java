@@ -138,7 +138,6 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
           stream.release();
           streams[i] = null;
         } else {
-          Log.d("sleman", "selections : - "  + selections[i].length());
           stream.getChunkSource().updateTrackSelection(selections[i]);
           sampleStreamsList.add(stream);
         }
