@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import android.util.Log;
 
 /**
  * Represents a DASH media presentation description (mpd), as defined by ISO/IEC 23009-1:2014
@@ -123,6 +124,7 @@ public class DashManifest implements FilterableManifest<DashManifest> {
   }
 
   public final Period getPeriod(int index) {
+    Log.d("sleman", " index 1 " + index);
     return periods.get(index);
   }
 
@@ -209,3 +211,4 @@ public class DashManifest implements FilterableManifest<DashManifest> {
     return copyAdaptationSets;
   }
 }
+

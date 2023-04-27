@@ -69,6 +69,7 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.checkerframework.checker.nullness.compatqual.NullableType;
+import android.util.Log;
 
 /** A DASH {@link MediaPeriod}. */
 /* package */ final class DashMediaPeriod
@@ -147,6 +148,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
     trackEmsgHandlerBySampleStream = new IdentityHashMap<>();
     compositeSequenceableLoader =
         compositeSequenceableLoaderFactory.createCompositeSequenceableLoader(sampleStreams);
+        Log.d("sleman", "ZXCZXC " + periodIndex);
     Period period = manifest.getPeriod(periodIndex);
     eventStreams = period.eventStreams;
     Pair<TrackGroupArray, TrackGroupInfo[]> result =
@@ -171,6 +173,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
       }
       callback.onContinueLoadingRequested(this);
     }
+    Log.d("sleman", "periodIndex 1" + periodIndex);
     eventStreams = manifest.getPeriod(periodIndex).eventStreams;
     for (EventSampleStream eventSampleStream : eventSampleStreams) {
       for (EventStream eventStream : eventStreams) {
@@ -223,6 +226,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
 
   @Override
   public List<StreamKey> getStreamKeys(List<ExoTrackSelection> trackSelections) {
+    Log.d("sleman", "periodIndex 2 " + periodIndex);
     List<AdaptationSet> manifestAdaptationSets = manifest.getPeriod(periodIndex).adaptationSets;
     List<StreamKey> streamKeys = new ArrayList<>();
     for (ExoTrackSelection trackSelection : trackSelections) {
