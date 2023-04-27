@@ -123,6 +123,7 @@ public class DashManifest implements FilterableManifest<DashManifest> {
   }
 
   public final Period getPeriod(int index) {
+    Log.d("sleman", " index 1 " + index);
     return periods.get(index);
   }
 
