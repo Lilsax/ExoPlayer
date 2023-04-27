@@ -69,6 +69,7 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.checkerframework.checker.nullness.compatqual.NullableType;
+import android.util.Log;
 
 /** A DASH {@link MediaPeriod}. */
 /* package */ final class DashMediaPeriod

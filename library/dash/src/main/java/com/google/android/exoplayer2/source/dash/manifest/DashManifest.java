@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import android.util.Log;
 
 /**
  * Represents a DASH media presentation description (mpd), as defined by ISO/IEC 23009-1:2014
