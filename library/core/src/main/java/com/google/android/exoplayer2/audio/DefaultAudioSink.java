@@ -66,7 +66,6 @@ import java.util.Collections;
 import java.util.concurrent.ExecutorService;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.checkerframework.checker.nullness.qual.RequiresNonNull;
-import android.util.Log;
 
 /**
  * Plays audio data. The implementation delegates to an {@link AudioTrack} and handles playback
