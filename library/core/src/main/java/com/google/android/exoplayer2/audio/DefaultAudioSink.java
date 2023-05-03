@@ -66,6 +66,7 @@ import java.util.Collections;
 import java.util.concurrent.ExecutorService;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.checkerframework.checker.nullness.qual.RequiresNonNull;
+import android.util.Log;
 
 /**
  * Plays audio data. The implementation delegates to an {@link AudioTrack} and handles playback
@@ -995,11 +996,13 @@ public final class DefaultAudioSink implements AudioSink {
                   getSubmittedFrames() - trimmingAudioProcessor.getTrimmedFrameCount());
       if (!startMediaTimeUsNeedsSync
           && Math.abs(expectedPresentationTimeUs - presentationTimeUs) > 200000) {
-        if (listener != null) {
-          listener.onAudioSinkError(
-              new AudioSink.UnexpectedDiscontinuityException(
-                  presentationTimeUs, expectedPresentationTimeUs));
-        }
+        
+        Log.d("sleman", "startMediaTimeUsNeedsSync");
+        // if (listener != null) {
+        //   listener.onAudioSinkError(
+        //       new AudioSink.UnexpectedDiscontinuityException(
+        //           presentationTimeUs, expectedPresentationTimeUs));
+        // }
         startMediaTimeUsNeedsSync = true;
       }
       if (startMediaTimeUsNeedsSync) {
