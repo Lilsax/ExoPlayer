@@ -996,7 +996,6 @@ public final class DefaultAudioSink implements AudioSink {
       if (!startMediaTimeUsNeedsSync
           && Math.abs(expectedPresentationTimeUs - presentationTimeUs) > 200000) {
         
-        Log.d("sleman", "startMediaTimeUsNeedsSync");
         // if (listener != null) {
         //   listener.onAudioSinkError(
         //       new AudioSink.UnexpectedDiscontinuityException(
