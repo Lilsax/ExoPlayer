@@ -1145,7 +1145,7 @@ public interface ExoPlayer extends Player {
   long DEFAULT_RELEASE_TIMEOUT_MS = 500;
 
   /** The default timeout for detaching a surface from the player, in milliseconds. */
-  long DEFAULT_DETACH_SURFACE_TIMEOUT_MS = 2_000;
+  long DEFAULT_DETACH_SURFACE_TIMEOUT_MS = 4_000;
 
   /**
    * Equivalent to {@link Player#getPlayerError()}, except the exception is guaranteed to be an
