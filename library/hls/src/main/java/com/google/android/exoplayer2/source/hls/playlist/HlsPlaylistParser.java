@@ -63,6 +63,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.checkerframework.checker.nullness.qual.EnsuresNonNullIf;
 import org.checkerframework.checker.nullness.qual.PolyNull;
+import android.util.Log;
 
 /** HLS playlists parsing logic. */
 public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlaylist> {
@@ -252,6 +253,9 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
 
   @Override
   public HlsPlaylist parse(Uri uri, InputStream inputStream) throws IOException {
+    Log.d("sleman", "uri " + uri);
+    Log.d("sleman", "uri " + uri);
+
     BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
     Queue<String> extraLines = new ArrayDeque<>();
     String line;
@@ -262,6 +266,7 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
       }
       while ((line = reader.readLine()) != null) {
         line = line.trim();
+        Log.d("sleman", "line " + line);
         if (line.isEmpty()) {
           // Do nothing.
         } else if (line.startsWith(TAG_STREAM_INF)) {
@@ -323,6 +328,7 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
 
   private static HlsMultivariantPlaylist parseMultivariantPlaylist(
       LineIterator iterator, String baseUri) throws IOException {
+    Log.d("sleman", "baseUri " + baseUri);
     HashMap<Uri, ArrayList<VariantInfo>> urlToVariantInfos = new HashMap<>();
     HashMap<String, String> variableDefinitions = new HashMap<>();
     ArrayList<Variant> variants = new ArrayList<>();
@@ -372,7 +378,10 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
         int roleFlags = isIFrameOnlyVariant ? C.ROLE_FLAG_TRICK_PLAY : 0;
         int peakBitrate = parseIntAttr(line, REGEX_BANDWIDTH);
         int averageBitrate = parseOptionalIntAttr(line, REGEX_AVERAGE_BANDWIDTH, -1);
+        Log.d("sleman", "averageBitrate " + averageBitrate);
         String codecs = parseOptionalStringAttr(line, REGEX_CODECS, variableDefinitions);
+        Log.d("sleman", "codecs " + codecs);
+
         String resolutionString =
             parseOptionalStringAttr(line, REGEX_RESOLUTION, variableDefinitions);
         int width;
@@ -390,6 +399,10 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
           width = Format.NO_VALUE;
           height = Format.NO_VALUE;
         }
+        Log.d("sleman", "width " + width);
+        Log.d("sleman", "height " + height);
+        Log.d("line", "line " + line);
+
         float frameRate = Format.NO_VALUE;
         String frameRateString =
             parseOptionalStringAttr(line, REGEX_FRAME_RATE, variableDefinitions);
@@ -406,6 +419,8 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
         if (isIFrameOnlyVariant) {
           uri =
               UriUtil.resolveToUri(baseUri, parseStringAttr(line, REGEX_URI, variableDefinitions));
+          Log.d("sleman", "uri 1" + uri.toString() );
+
         } else if (!iterator.hasNext()) {
           throw ParserException.createForMalformedManifest(
               "#EXT-X-STREAM-INF must be followed by another line", /* cause= */ null);
@@ -413,8 +428,11 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
           // The following line contains #EXT-X-STREAM-INF's URI.
           line = replaceVariableReferences(iterator.next(), variableDefinitions);
           uri = UriUtil.resolveToUri(baseUri, line);
+          Log.d("sleman", "uri 2 " + uri.toString() );
+
         }
 
+        Log.d("sleman", "uri " + uri.toString() );
         Format format =
             new Format.Builder()
                 .setId(variants.size())
@@ -431,6 +449,9 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
             new Variant(
                 uri, format, videoGroupId, audioGroupId, subtitlesGroupId, closedCaptionsGroupId);
         variants.add(variant);
+        if(variant != null) {
+          Log.d("sleman", "variant " + variant.toString());
+        }
         @Nullable ArrayList<VariantInfo> variantInfosForUrl = urlToVariantInfos.get(uri);
         if (variantInfosForUrl == null) {
           variantInfosForUrl = new ArrayList<>();
