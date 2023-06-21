@@ -251,51 +251,51 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
     this.previousMediaPlaylist = previousMediaPlaylist;
   }
 
-  // @Override
-//  public HlsPlaylist parse(Uri uri, InputStream inputStream) throws IOException {
-//    Log.d("sleman", "uri " + uri);
-//    Log.d("sleman", "uri " + uri);
-//
-//    BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
-//    Queue<String> extraLines = new ArrayDeque<>();
-//    String line;
-//    try {
-//      if (!checkPlaylistHeader(reader)) {
-//        throw ParserException.createForMalformedManifest(
-//            /* message= */ "Input does not start with the #EXTM3U header.", /* cause= */ null);
-//      }
-//      while ((line = reader.readLine()) != null) {
-//        line = line.trim();
-//        Log.d("sleman", "line " + line);
-//        if (line.isEmpty()) {
-//          // Do nothing.
-//        } else if (line.startsWith(TAG_STREAM_INF)) {
-//          extraLines.add(line);
-//          return parseMultivariantPlaylist(new LineIterator(extraLines, reader), uri.toString());
-//        } else if (line.startsWith(TAG_TARGET_DURATION)
-//            || line.startsWith(TAG_MEDIA_SEQUENCE)
-//            || line.startsWith(TAG_MEDIA_DURATION)
-//            || line.startsWith(TAG_KEY)
-//            || line.startsWith(TAG_BYTERANGE)
-//            || line.equals(TAG_DISCONTINUITY)
-//            || line.equals(TAG_DISCONTINUITY_SEQUENCE)
-//            || line.equals(TAG_ENDLIST)) {
-//          extraLines.add(line);
-//          return parseMediaPlaylist(
-//              multivariantPlaylist,
-//              previousMediaPlaylist,
-//              new LineIterator(extraLines, reader),
-//              uri.toString());
-//        } else {
-//          extraLines.add(line);
-//        }
-//      }
-//    } finally {
-//      Util.closeQuietly(reader);
-//    }
-//    throw ParserException.createForMalformedManifest(
-//        "Failed to parse the playlist, could not identify any tags.", /* cause= */ null);
-//  }
+  @Override
+ public HlsPlaylist parse(Uri uri, InputStream inputStream) throws IOException {
+   Log.d("sleman", "uri " + uri);
+   Log.d("sleman", "uri " + uri);
+
+   BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+   Queue<String> extraLines = new ArrayDeque<>();
+   String line;
+   try {
+     if (!checkPlaylistHeader(reader)) {
+       throw ParserException.createForMalformedManifest(
+           /* message= */ "Input does not start with the #EXTM3U header.", /* cause= */ null);
+     }
+     while ((line = reader.readLine()) != null) {
+       line = line.trim();
+       Log.d("sleman", "line " + line);
+       if (line.isEmpty()) {
+         // Do nothing.
+       } else if (line.startsWith(TAG_STREAM_INF)) {
+         extraLines.add(line);
+         return parseMultivariantPlaylist(new LineIterator(extraLines, reader), uri.toString());
+       } else if (line.startsWith(TAG_TARGET_DURATION)
+           || line.startsWith(TAG_MEDIA_SEQUENCE)
+           || line.startsWith(TAG_MEDIA_DURATION)
+           || line.startsWith(TAG_KEY)
+           || line.startsWith(TAG_BYTERANGE)
+           || line.equals(TAG_DISCONTINUITY)
+           || line.equals(TAG_DISCONTINUITY_SEQUENCE)
+           || line.equals(TAG_ENDLIST)) {
+         extraLines.add(line);
+         return parseMediaPlaylist(
+             multivariantPlaylist,
+             previousMediaPlaylist,
+             new LineIterator(extraLines, reader),
+             uri.toString());
+       } else {
+         extraLines.add(line);
+       }
+     }
+   } finally {
+     Util.closeQuietly(reader);
+   }
+   throw ParserException.createForMalformedManifest(
+       "Failed to parse the playlist, could not identify any tags.", /* cause= */ null);
+ }
 
   private static boolean checkPlaylistHeader(BufferedReader reader) throws IOException {
     int last = reader.read();
