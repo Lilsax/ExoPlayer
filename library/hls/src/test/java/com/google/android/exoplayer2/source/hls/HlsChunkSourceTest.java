@@ -33,6 +33,7 @@ import com.google.android.exoplayer2.source.hls.playlist.HlsPlaylistTracker;
 import com.google.android.exoplayer2.testutil.ExoPlayerTestRunner;
 import com.google.android.exoplayer2.testutil.FakeDataSource;
 import com.google.android.exoplayer2.testutil.TestUtil;
+import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.MimeTypes;
 import java.io.IOException;
 import java.io.InputStream;
@@ -72,6 +73,7 @@ public class HlsChunkSourceTest {
     InputStream inputStream =
         TestUtil.getInputStream(
             ApplicationProvider.getApplicationContext(), PLAYLIST_INDEPENDENT_SEGMENTS);
+    Log.d("sleman", "PLAYLIST_URI " + PLAYLIST_URI);
     HlsMediaPlaylist playlist =
         (HlsMediaPlaylist) new HlsPlaylistParser().parse(PLAYLIST_URI, inputStream);
     when(mockPlaylistTracker.getPlaylistSnapshot(eq(PLAYLIST_URI), anyBoolean()))
@@ -156,6 +158,7 @@ public class HlsChunkSourceTest {
         TestUtil.getInputStream(ApplicationProvider.getApplicationContext(), PLAYLIST);
     HlsMediaPlaylist playlist =
         (HlsMediaPlaylist) new HlsPlaylistParser().parse(PLAYLIST_URI, inputStream);
+    Log.d("sleman", "PLAYLIST_URI " + PLAYLIST_URI);
     when(mockPlaylistTracker.getPlaylistSnapshot(eq(PLAYLIST_URI), anyBoolean()))
         .thenReturn(playlist);
 
@@ -170,6 +173,8 @@ public class HlsChunkSourceTest {
   public void getAdjustedSeekPositionUs_emptyPlaylist() throws IOException {
     InputStream inputStream =
         TestUtil.getInputStream(ApplicationProvider.getApplicationContext(), PLAYLIST_EMPTY);
+    Log.d("sleman", "PLAYLIST_URI " + PLAYLIST_URI);
+
     HlsMediaPlaylist playlist =
         (HlsMediaPlaylist) new HlsPlaylistParser().parse(PLAYLIST_URI, inputStream);
     when(mockPlaylistTracker.getPlaylistSnapshot(eq(PLAYLIST_URI), anyBoolean()))

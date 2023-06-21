@@ -67,10 +67,6 @@ import org.checkerframework.checker.nullness.qual.PolyNull;
 /** HLS playlists parsing logic. */
 public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlaylist> {
 
-  @Override
-  public HlsPlaylist parse(Uri uri, InputStream inputStream) throws IOException {
-    return null;
-  }
 
   /** Exception thrown when merging a delta update fails. */
   public static final class DeltaUpdateException extends IOException {}
