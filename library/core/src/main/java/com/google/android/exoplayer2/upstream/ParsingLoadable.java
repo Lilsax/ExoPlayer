@@ -123,6 +123,9 @@ public final class ParsingLoadable<T> implements Loadable {
    */
   public ParsingLoadable(
       DataSource dataSource, DataSpec dataSpec, int type, Parser<? extends T> parser) {
+    Log.d("sleman", "dataSource.getUri() " + dataSource.getUri());
+    Log.d("sleman", "dataSource.toString() " + dataSource.toString());
+
     this.dataSource = new StatsDataSource(dataSource);
     this.dataSpec = dataSpec;
     this.type = type;
@@ -169,10 +172,14 @@ public final class ParsingLoadable<T> implements Loadable {
   @Override
   public final void load() throws IOException {
     // We always load from the beginning, so reset bytesRead to 0.
+    if(dataSource != null) {
+      Log.e("sleman", "dataSource.resetBytesRead() " + dataSource.toString());
+    }
     dataSource.resetBytesRead();
     DataSourceInputStream inputStream = new DataSourceInputStream(dataSource, dataSpec);
     try {
       inputStream.open();
+      Log.d("sleman",  "dataSource.getUri() " + dataSource.getUri());
       Uri dataSourceUri = Assertions.checkNotNull(dataSource.getUri());
       Log.d("sleman", "dataSourceUri suu " + dataSourceUri);
       result = parser.parse(dataSourceUri, inputStream);

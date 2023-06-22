@@ -27,6 +27,7 @@ import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DataSpec;
 import com.google.android.exoplayer2.upstream.ParsingLoadable.Parser;
 import com.google.android.exoplayer2.upstream.cache.CacheDataSource;
+import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.UriUtil;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -159,6 +160,7 @@ public final class HlsDownloader extends SegmentDownloader<HlsPlaylist> {
       segments.add(new Segment(/* startTimeUs= */ 0, mediaPlaylistDataSpec));
       HlsMediaPlaylist mediaPlaylist;
       try {
+        Log.d("sleman", "that was lil uzi  " + dataSource.getUri());
         mediaPlaylist = (HlsMediaPlaylist) getManifest(dataSource, mediaPlaylistDataSpec, removing);
       } catch (IOException e) {
         if (!removing) {

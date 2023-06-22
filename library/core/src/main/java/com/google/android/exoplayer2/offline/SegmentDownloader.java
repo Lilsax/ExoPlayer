@@ -31,6 +31,7 @@ import com.google.android.exoplayer2.upstream.cache.CacheKeyFactory;
 import com.google.android.exoplayer2.upstream.cache.CacheWriter;
 import com.google.android.exoplayer2.upstream.cache.ContentMetadata;
 import com.google.android.exoplayer2.util.Assertions;
+import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.PriorityTaskManager;
 import com.google.android.exoplayer2.util.PriorityTaskManager.PriorityTooLowException;
 import com.google.android.exoplayer2.util.RunnableFutureTask;
@@ -156,7 +157,11 @@ public abstract class SegmentDownloader<M extends FilterableManifest<M>> impleme
       priorityTaskManager.add(C.PRIORITY_DOWNLOAD);
     }
     try {
+      if(cacheDataSourceFactory != null) {
+          Log.d("sleman", "cacheDataSourceFactory " + cacheDataSourceFactory.toString());
+      }
       CacheDataSource dataSource = cacheDataSourceFactory.createDataSourceForDownloading();
+      Log.e("sleman", "lil durk " + dataSource.getUri());
       // Get the manifest and all of the segments.
       M manifest = getManifest(dataSource, manifestDataSpec, /* removing= */ false);
       if (!streamKeys.isEmpty()) {
@@ -303,6 +308,7 @@ public abstract class SegmentDownloader<M extends FilterableManifest<M>> impleme
   public final void remove() {
     CacheDataSource dataSource = cacheDataSourceFactory.createDataSourceForRemovingDownload();
     try {
+      Log.d("sleman", "LMAOOOOASDSADASDASD");
       M manifest = getManifest(dataSource, manifestDataSpec, /* removing= */ true);
       List<Segment> segments = getSegments(dataSource, manifest, /* removing= */ true);
       for (int i = 0; i < segments.size(); i++) {
@@ -332,6 +338,7 @@ public abstract class SegmentDownloader<M extends FilterableManifest<M>> impleme
    */
   protected final M getManifest(DataSource dataSource, DataSpec dataSpec, boolean removing)
       throws InterruptedException, IOException {
+    Log.d("sleman", "hahaha");
     return execute(
         new RunnableFutureTask<M, IOException>() {
           @Override
