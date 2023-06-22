@@ -41,6 +41,7 @@ import com.google.android.exoplayer2.upstream.Loader;
 import com.google.android.exoplayer2.upstream.Loader.LoadErrorAction;
 import com.google.android.exoplayer2.upstream.ParsingLoadable;
 import com.google.android.exoplayer2.util.Assertions;
+import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.Util;
 import com.google.common.collect.Iterables;
 import java.io.IOException;
@@ -131,6 +132,7 @@ public final class DefaultHlsPlaylistTracker
     this.playlistRefreshHandler = Util.createHandlerForCurrentLooper();
     this.eventDispatcher = eventDispatcher;
     this.primaryPlaylistListener = primaryPlaylistListener;
+    Log.d("sleman", "MMMM ");
     ParsingLoadable<HlsPlaylist> multivariantPlaylistLoadable =
         new ParsingLoadable<>(
             dataSourceFactory.createDataSource(C.DATA_TYPE_MANIFEST),
@@ -693,6 +695,7 @@ public final class DefaultHlsPlaylistTracker
     }
 
     private void loadPlaylistImmediately(Uri playlistRequestUri) {
+      Log.e("sleman", "OH NOOOOOOOOO" + playlistRequestUri.toString());
       ParsingLoadable.Parser<HlsPlaylist> mediaPlaylistParser =
           playlistParserFactory.createPlaylistParser(multivariantPlaylist, playlistSnapshot);
       ParsingLoadable<HlsPlaylist> mediaPlaylistLoadable =

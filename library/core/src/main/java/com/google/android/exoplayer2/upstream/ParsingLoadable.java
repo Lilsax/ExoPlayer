@@ -81,6 +81,7 @@ public final class ParsingLoadable<T> implements Loadable {
   public static <T> T load(
       DataSource dataSource, Parser<? extends T> parser, DataSpec dataSpec, int type)
       throws IOException {
+    Log.d("sleman", "load uzi");
     ParsingLoadable<T> loadable = new ParsingLoadable<>(dataSource, dataSpec, type, parser);
     loadable.load();
     return Assertions.checkNotNull(loadable.getResult());
@@ -113,6 +114,7 @@ public final class ParsingLoadable<T> implements Loadable {
         new DataSpec.Builder().setUri(uri).setFlags(DataSpec.FLAG_ALLOW_GZIP).build(),
         type,
         parser);
+    Log.d("sleman", "load king von");
   }
 
   /**
