@@ -259,7 +259,20 @@ public final class DefaultHlsPlaylistTracker
       multivariantPlaylist = (HlsMultivariantPlaylist) result;
     }
     this.multivariantPlaylist = multivariantPlaylist;
+    Log.d("sleman", "multivariantPlaylist.baseUri " + multivariantPlaylist.baseUri);
+
+    for(int i = 0; i < multivariantPlaylist.variants.size() ; i++) {
+      Log.d("sleman", "multivariantPlaylist.baseUri " + i + " " + multivariantPlaylist.variants.get(i).url);
+    }
+
+    for(int i = 0; i < multivariantPlaylist.mediaPlaylistUrls.size() ; i++) {
+      Log.d("sleman", "yazeed " + i + " " + multivariantPlaylist.mediaPlaylistUrls.get(i).toString());
+      Log.d("sleman", "multivariantPlaylist.baseUri " + i + " " + multivariantPlaylist.mediaPlaylistUrls.get(i).getPath());
+    }
+
+    Log.d("sleman", "loadable.getUri() " + loadable.getUri());
     primaryMediaPlaylistUrl = multivariantPlaylist.variants.get(0).url;
+
     // Add a temporary playlist listener for loading the first primary playlist.
     listeners.add(new FirstPrimaryMediaPlaylistListener());
     createBundles(multivariantPlaylist.mediaPlaylistUrls);
