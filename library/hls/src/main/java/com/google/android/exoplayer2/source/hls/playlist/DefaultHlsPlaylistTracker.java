@@ -247,7 +247,9 @@ public final class DefaultHlsPlaylistTracker
   @Override
   public void onLoadCompleted(
       ParsingLoadable<HlsPlaylist> loadable, long elapsedRealtimeMs, long loadDurationMs) {
+    Log.d("sleman", "shwakii");
     HlsPlaylist result = loadable.getResult();
+    Log.d("sleman", "result " + result.baseUri);
     HlsMultivariantPlaylist multivariantPlaylist;
     boolean isMediaPlaylist = result instanceof HlsMediaPlaylist;
     if (isMediaPlaylist) {
@@ -724,6 +726,7 @@ public final class DefaultHlsPlaylistTracker
     private void processLoadedPlaylist(
         HlsMediaPlaylist loadedPlaylist, LoadEventInfo loadEventInfo) {
       Log.d("sleman", "someone who used to love");
+      Log.d("sleman", "love " + loadedPlaylist.baseUri);
 
       @Nullable HlsMediaPlaylist oldPlaylist = playlistSnapshot;
       long currentTimeMs = SystemClock.elapsedRealtime();
@@ -789,6 +792,7 @@ public final class DefaultHlsPlaylistTracker
               && !playlistSnapshot.serverControl.canBlockReload)) {
         return playlistUrl;
       }
+      Log.d("sleman","playlistUrl " + playlistUrl.toString());
       Uri.Builder uriBuilder = playlistUrl.buildUpon();
       if (playlistSnapshot.serverControl.canBlockReload) {
         long targetMediaSequence =
