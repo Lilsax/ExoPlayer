@@ -288,22 +288,37 @@ public class HlsMultivariantPlaylist extends HlsPlaylist {
       }
     }
     Log.d("sleman", "mediaPlaylistUrls size 1" + mediaPlaylistUrls.size());
+    for(int i = 0; i < mediaPlaylistUrls.size(); i++) {
+      Log.d("sleman", "maya " + mediaPlaylistUrls.get(0).toString());
+    }
     addMediaPlaylistUrls(videos, mediaPlaylistUrls);
     Log.d("sleman", "mediaPlaylistUrls size 2" + mediaPlaylistUrls.size());
+    for(int i = 0; i < mediaPlaylistUrls.size(); i++) {
+      Log.d("sleman", "maya " + mediaPlaylistUrls.get(0).toString());
+    }
 
     addMediaPlaylistUrls(audios, mediaPlaylistUrls);
     Log.d("sleman", "mediaPlaylistUrls size 3" + mediaPlaylistUrls.size());
+    for(int i = 0; i < mediaPlaylistUrls.size(); i++) {
+      Log.d("sleman", "maya " + mediaPlaylistUrls.get(0).toString());
+    }
 
     addMediaPlaylistUrls(subtitles, mediaPlaylistUrls);
     Log.d("sleman", "mediaPlaylistUrls size 4" + mediaPlaylistUrls.size());
+    for(int i = 0; i < mediaPlaylistUrls.size(); i++) {
+      Log.d("sleman", "maya " + mediaPlaylistUrls.get(0).toString());
+    }
 
     addMediaPlaylistUrls(closedCaptions, mediaPlaylistUrls);
     Log.d("sleman", "mediaPlaylistUrls size 5" + mediaPlaylistUrls.size());
-
+    for(int i = 0; i < mediaPlaylistUrls.size(); i++) {
+      Log.d("sleman", "maya " + mediaPlaylistUrls.get(0).toString());
+    }
     return mediaPlaylistUrls;
   }
 
   private static void addMediaPlaylistUrls(List<Rendition> renditions, List<Uri> out) {
+
     for (int i = 0; i < renditions.size(); i++) {
       Uri uri = renditions.get(i).url;
       if (uri != null && !out.contains(uri)) {
