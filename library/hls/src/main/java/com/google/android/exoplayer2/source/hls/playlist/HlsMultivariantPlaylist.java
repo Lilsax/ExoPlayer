@@ -20,6 +20,7 @@ import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.drm.DrmInitData;
 import com.google.android.exoplayer2.offline.StreamKey;
+import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.MimeTypes;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -248,6 +249,10 @@ public class HlsMultivariantPlaylist extends HlsPlaylist {
   public static HlsMultivariantPlaylist createSingleVariantMultivariantPlaylist(String variantUrl) {
     List<Variant> variant =
         Collections.singletonList(Variant.createMediaPlaylistVariantUrl(Uri.parse(variantUrl)));
+    for(int i = 0; i < variant.size() ; i++) {
+      Log.e("sleman", "ayham "  + i + " " + variant.get(i).url);
+    }
+    
     return new HlsMultivariantPlaylist(
         /* baseUri= */ "",
         /* tags= */ Collections.emptyList(),
@@ -269,6 +274,11 @@ public class HlsMultivariantPlaylist extends HlsPlaylist {
       List<Rendition> audios,
       List<Rendition> subtitles,
       List<Rendition> closedCaptions) {
+
+    for(int i =0; i < variants.size() ; i++) {
+      Log.d("sleman", "owias " + variants.get(i).url);
+    }
+
     ArrayList<Uri> mediaPlaylistUrls = new ArrayList<>();
     for (int i = 0; i < variants.size(); i++) {
       Uri uri = variants.get(i).url;
