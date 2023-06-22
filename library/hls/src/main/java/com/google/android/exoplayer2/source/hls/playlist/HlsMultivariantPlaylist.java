@@ -249,10 +249,11 @@ public class HlsMultivariantPlaylist extends HlsPlaylist {
   public static HlsMultivariantPlaylist createSingleVariantMultivariantPlaylist(String variantUrl) {
     List<Variant> variant =
         Collections.singletonList(Variant.createMediaPlaylistVariantUrl(Uri.parse(variantUrl)));
+    Log.d("sleman", "variant size" + variant.size());
     for(int i = 0; i < variant.size() ; i++) {
-      Log.e("sleman", "ayham "  + i + " " + variant.get(i).url);
+      Log.d("sleman", "ayham "  + i + " " + variant.get(i).url);
     }
-    
+
     return new HlsMultivariantPlaylist(
         /* baseUri= */ "",
         /* tags= */ Collections.emptyList(),
@@ -286,10 +287,19 @@ public class HlsMultivariantPlaylist extends HlsPlaylist {
         mediaPlaylistUrls.add(uri);
       }
     }
+    Log.d("sleman", "mediaPlaylistUrls size 1" + mediaPlaylistUrls.size());
     addMediaPlaylistUrls(videos, mediaPlaylistUrls);
+    Log.d("sleman", "mediaPlaylistUrls size 2" + mediaPlaylistUrls.size());
+
     addMediaPlaylistUrls(audios, mediaPlaylistUrls);
+    Log.d("sleman", "mediaPlaylistUrls size 3" + mediaPlaylistUrls.size());
+
     addMediaPlaylistUrls(subtitles, mediaPlaylistUrls);
+    Log.d("sleman", "mediaPlaylistUrls size 4" + mediaPlaylistUrls.size());
+
     addMediaPlaylistUrls(closedCaptions, mediaPlaylistUrls);
+    Log.d("sleman", "mediaPlaylistUrls size 5" + mediaPlaylistUrls.size());
+
     return mediaPlaylistUrls;
   }
 
