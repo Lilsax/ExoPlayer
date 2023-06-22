@@ -289,30 +289,30 @@ public class HlsMultivariantPlaylist extends HlsPlaylist {
     }
     Log.d("sleman", "mediaPlaylistUrls size 1" + mediaPlaylistUrls.size());
     for(int i = 0; i < mediaPlaylistUrls.size(); i++) {
-      Log.d("sleman", "maya " + mediaPlaylistUrls.get(0).toString());
+      Log.d("sleman", "maya " + mediaPlaylistUrls.get(i).toString());
     }
     addMediaPlaylistUrls(videos, mediaPlaylistUrls);
     Log.d("sleman", "mediaPlaylistUrls size 2" + mediaPlaylistUrls.size());
     for(int i = 0; i < mediaPlaylistUrls.size(); i++) {
-      Log.d("sleman", "maya " + mediaPlaylistUrls.get(0).toString());
+      Log.d("sleman", "maya " + mediaPlaylistUrls.get(i).toString());
     }
 
     addMediaPlaylistUrls(audios, mediaPlaylistUrls);
     Log.d("sleman", "mediaPlaylistUrls size 3" + mediaPlaylistUrls.size());
     for(int i = 0; i < mediaPlaylistUrls.size(); i++) {
-      Log.d("sleman", "maya " + mediaPlaylistUrls.get(0).toString());
+      Log.d("sleman", "maya " + mediaPlaylistUrls.get(i).toString());
     }
 
     addMediaPlaylistUrls(subtitles, mediaPlaylistUrls);
     Log.d("sleman", "mediaPlaylistUrls size 4" + mediaPlaylistUrls.size());
     for(int i = 0; i < mediaPlaylistUrls.size(); i++) {
-      Log.d("sleman", "maya " + mediaPlaylistUrls.get(0).toString());
+      Log.d("sleman", "maya " + mediaPlaylistUrls.get(i).toString());
     }
 
     addMediaPlaylistUrls(closedCaptions, mediaPlaylistUrls);
     Log.d("sleman", "mediaPlaylistUrls size 5" + mediaPlaylistUrls.size());
     for(int i = 0; i < mediaPlaylistUrls.size(); i++) {
-      Log.d("sleman", "maya " + mediaPlaylistUrls.get(0).toString());
+      Log.d("sleman", "maya " + mediaPlaylistUrls.get(i).toString());
     }
     return mediaPlaylistUrls;
   }
