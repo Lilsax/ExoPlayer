@@ -206,6 +206,13 @@ public class HlsMultivariantPlaylist extends HlsPlaylist {
       Map<String, String> variableDefinitions,
       List<DrmInitData> sessionKeyDrmInitData) {
     super(baseUri, tags, hasIndependentSegments);
+    for(int i = 0 ; i < audios.size() ; i++) {
+      Log.d("sleman", "audio url lol " + audios.get(i).url);
+    }
+
+    for(int i = 0 ; i < subtitles.size() ; i++) {
+      Log.d("sleman", "audio url lol " + subtitles.get(i).url);
+    }
     this.mediaPlaylistUrls =
         Collections.unmodifiableList(
             getMediaPlaylistUrls(variants, videos, audios, subtitles, closedCaptions));
@@ -320,6 +327,11 @@ public class HlsMultivariantPlaylist extends HlsPlaylist {
   private static void addMediaPlaylistUrls(List<Rendition> renditions, List<Uri> out) {
 
     for (int i = 0; i < renditions.size(); i++) {
+      Log.d("sleman", "renditions "+ renditions.get(i).toString());
+      Log.d("sleman", "renditions 1"+ renditions.get(i).name);
+      Log.d("sleman", "renditions 2"+ renditions.get(i).url);
+      Log.d("sleman", "renditions 3"+ renditions.get(i).groupId);
+
       Uri uri = renditions.get(i).url;
       if (uri != null && !out.contains(uri)) {
         out.add(uri);
