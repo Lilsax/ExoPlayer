@@ -333,6 +333,7 @@ public final class DefaultHlsPlaylistTracker
   // Internal methods.
 
   private boolean maybeSelectNewPrimaryUrl() {
+    Log.d("sleman", "wwwwwwwwww");
     List<Variant> variants = multivariantPlaylist.variants;
     int variantsSize = variants.size();
     long currentTimeMs = SystemClock.elapsedRealtime();
@@ -340,6 +341,8 @@ public final class DefaultHlsPlaylistTracker
       MediaPlaylistBundle bundle = checkNotNull(playlistBundles.get(variants.get(i).url));
       if (currentTimeMs > bundle.excludeUntilMs) {
         primaryMediaPlaylistUrl = bundle.playlistUrl;
+        Log.d("sleman", "wwwwwwwwww " + bundle.toString());
+
         bundle.loadPlaylistInternal(getRequestUriForPrimaryChange(primaryMediaPlaylistUrl));
         return true;
       }
@@ -348,6 +351,7 @@ public final class DefaultHlsPlaylistTracker
   }
 
   private void maybeSetPrimaryUrl(Uri url) {
+    Log.d("sleman", "maybe " + url.toString());
     if (url.equals(primaryMediaPlaylistUrl)
         || !isVariantUrl(url)
         || (primaryMediaPlaylistSnapshot != null && primaryMediaPlaylistSnapshot.hasEndTag)) {
@@ -553,6 +557,8 @@ public final class DefaultHlsPlaylistTracker
     }
 
     public void loadPlaylist() {
+      Log.d("sleman", "there was someone behind this");
+
       loadPlaylistInternal(playlistUrl);
     }
 
@@ -717,6 +723,8 @@ public final class DefaultHlsPlaylistTracker
 
     private void processLoadedPlaylist(
         HlsMediaPlaylist loadedPlaylist, LoadEventInfo loadEventInfo) {
+      Log.d("sleman", "someone who used to love");
+
       @Nullable HlsMediaPlaylist oldPlaylist = playlistSnapshot;
       long currentTimeMs = SystemClock.elapsedRealtime();
       lastSnapshotLoadMs = currentTimeMs;
@@ -775,6 +783,7 @@ public final class DefaultHlsPlaylistTracker
     }
 
     private Uri getMediaPlaylistUriForReload() {
+      Log.d("sleman", "session id");
       if (playlistSnapshot == null
           || (playlistSnapshot.serverControl.skipUntilUs == C.TIME_UNSET
               && !playlistSnapshot.serverControl.canBlockReload)) {
