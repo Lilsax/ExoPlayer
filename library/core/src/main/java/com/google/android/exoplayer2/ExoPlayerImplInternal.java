@@ -573,7 +573,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
       Log.d("sleman", "e " , e);
       Log.d("sleman", "e " + e.getCause());
       Log.d("sleman", "e " + e.getMessage());
-      Log.d("sleman", "e " + e.);
 
       if (e.type == ExoPlaybackException.TYPE_RENDERER) {
         @Nullable MediaPeriodHolder readingPeriod = queue.getReadingPeriod();
