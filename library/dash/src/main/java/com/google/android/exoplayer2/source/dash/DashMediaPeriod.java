@@ -447,7 +447,6 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
         streamResetFlags[i] = true;
         int trackGroupIndex = streamIndexToTrackGroupIndex[i];
 
-        Log.d("sleman", "streams[i]  " + streams[i].toString());
         Log.d("sleman", " trackGroupIndex " + trackGroupIndex);
         Log.d("sleman", " 1 " + streamIndexToTrackGroupIndex.length);
 
