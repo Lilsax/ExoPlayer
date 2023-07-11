@@ -432,7 +432,11 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
     // Create newly selected primary and event streams.
     for (int i = 0; i < selections.length; i++) {
       ExoTrackSelection selection = selections[i];
-      Log.d("sleman", "selection " + selection.toString());
+
+      if(selection != null) {
+        Log.d("sleman", "selection " + selection.toString());
+      }
+
       Log.d("sleman", "i " + i);
 
       if (selection == null) {
@@ -442,6 +446,8 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
         // Create new stream for selection.
         streamResetFlags[i] = true;
         int trackGroupIndex = streamIndexToTrackGroupIndex[i];
+
+        Log.d("sleman", "streams[i]  " + streams[i].toString());
         Log.d("sleman", " trackGroupIndex " + trackGroupIndex);
         Log.d("sleman", " 1 " + streamIndexToTrackGroupIndex.length);
 
