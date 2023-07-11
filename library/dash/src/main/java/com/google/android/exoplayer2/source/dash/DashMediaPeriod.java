@@ -454,6 +454,9 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
           Log.d("sleman", " NF " + streamIndexToTrackGroupIndex[w]);
         }
         TrackGroupInfo trackGroupInfo = trackGroupInfos[trackGroupIndex];
+        if(trackGroupInfo != null) {
+          Log.d("sleman", "trackGroupInfo " + trackGroupInfo.trackType);
+        }
         if (trackGroupInfo.trackGroupCategory == TrackGroupInfo.CATEGORY_PRIMARY) {
           streams[i] = buildSampleStream(trackGroupInfo, selection, positionUs);
         } else if (trackGroupInfo.trackGroupCategory == TrackGroupInfo.CATEGORY_MANIFEST_EVENTS) {
