@@ -372,7 +372,6 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
     for (int i = 0; i < selections.length; i++) {
       if (selections[i] != null) {
 
-        Log.d("sleman", "treasure " + trackGroups.indexOf(selections[i].getTrackGroup()));
         streamIndexToTrackGroupIndex[i] = trackGroups.indexOf(selections[i].getTrackGroup());
       } else {
         streamIndexToTrackGroupIndex[i] = C.INDEX_UNSET;
