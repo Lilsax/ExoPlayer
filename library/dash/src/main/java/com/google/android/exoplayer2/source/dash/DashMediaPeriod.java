@@ -101,6 +101,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
   private final MediaSourceEventListener.EventDispatcher mediaSourceEventDispatcher;
   private final DrmSessionEventListener.EventDispatcher drmEventDispatcher;
   private final PlayerId playerId;
+  private int counter = 0;
 
   @Nullable private Callback callback;
   private ChunkSampleStream<DashChunkSource>[] sampleStreams;
@@ -441,7 +442,13 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
       if (streams[i] == null) {
         // Create new stream for selection.
         streamResetFlags[i] = true;
-        int trackGroupIndex = streamIndexToTrackGroupIndex[i];
+        int trackGroupIndex = -1 ;//streamIndexToTrackGroupIndex[i];
+
+        if(trackGroupIndex < 0 && counter >= 3) {
+          continue;
+        } else {
+          counter = counter + 1;
+        }
 
         TrackGroupInfo trackGroupInfo = trackGroupInfos[trackGroupIndex];
         if (trackGroupInfo.trackGroupCategory == TrackGroupInfo.CATEGORY_PRIMARY) {
