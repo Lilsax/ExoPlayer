@@ -385,12 +385,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
           Log.d("sleman" , "LMAO 3 " + trackGroups.get(w).id);
         }
 
-        for(int w = 0; w < trackGroups.length; w++) {
-          Log.d("sleman" , "LMAO  1" + trackGroups.get(w).type);
-          Log.d("sleman" , "LMAO 2 " + trackGroups.get(w).length);
-          Log.d("sleman" , "LMAO 3 " + trackGroups.get(w).id);
-        }
-
+        Log.d("sleman", "treasure " + trackGroups.indexOf(selections[i].getTrackGroup()));
         streamIndexToTrackGroupIndex[i] = trackGroups.indexOf(selections[i].getTrackGroup());
       } else {
         if(selections[i] != null) {
