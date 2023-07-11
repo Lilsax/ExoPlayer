@@ -373,7 +373,9 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
     for (int i = 0; i < selections.length; i++) {
       if (selections[i] != null) {
 
-        streamIndexToTrackGroupIndex[i] = trackGroups.indexOf(selections[i].getTrackGroup());
+        int sleman = trackGroups.indexOf(selections[i].getTrackGroup());
+        streamIndexToTrackGroupIndex[i] = sleman;
+        Log.d("sleman", " sleman " + sleman);
       } else {
         streamIndexToTrackGroupIndex[i] = C.INDEX_UNSET;
       }
@@ -442,15 +444,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
       if (streams[i] == null) {
         // Create new stream for selection.
         streamResetFlags[i] = true;
-        int trackGroupIndex = -1 ;//streamIndexToTrackGroupIndex[i];
-
-        if(trackGroupIndex < 0 && counter >= 3) {
-          Log.d("sleman", "HELLO FROM THE OTHER SIDE");
-          continue;
-
-        } else {
-          counter = counter + 1;
-        }
+        int trackGroupIndex = streamIndexToTrackGroupIndex[i];
 
         TrackGroupInfo trackGroupInfo = trackGroupInfos[trackGroupIndex];
         if (trackGroupInfo.trackGroupCategory == TrackGroupInfo.CATEGORY_PRIMARY) {
