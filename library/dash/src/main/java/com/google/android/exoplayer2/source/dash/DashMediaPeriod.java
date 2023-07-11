@@ -271,11 +271,6 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
       @NullableType SampleStream[] streams,
       boolean[] streamResetFlags,
       long positionUs) {
-    if (selections != null) {
-      Log.d("sleman", "ya mohseen");
-    } else {
-      Log.d("sleman", "that is cringe");
-    }
     int[] streamIndexToTrackGroupIndex = getStreamIndexToTrackGroupIndex(selections);
     releaseDisabledStreams(selections, mayRetainStreamFlags, streams);
     releaseOrphanEmbeddedStreams(selections, streams, streamIndexToTrackGroupIndex);
@@ -373,25 +368,13 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
 
   private int[] getStreamIndexToTrackGroupIndex(ExoTrackSelection[] selections) {
     int[] streamIndexToTrackGroupIndex = new int[selections.length];
-    Log.d("sleman", "selections " + selections.length);
 
     for (int i = 0; i < selections.length; i++) {
       if (selections[i] != null) {
-        Log.d("sleman", "trackGroups " + trackGroups.length);
-
-        for(int w = 0; w < trackGroups.length; w++) {
-          Log.d("sleman" , "LMAO  1" + trackGroups.get(w).type);
-          Log.d("sleman" , "LMAO 2 " + trackGroups.get(w).length);
-          Log.d("sleman" , "LMAO 3 " + trackGroups.get(w).id);
-        }
 
         Log.d("sleman", "treasure " + trackGroups.indexOf(selections[i].getTrackGroup()));
         streamIndexToTrackGroupIndex[i] = trackGroups.indexOf(selections[i].getTrackGroup());
       } else {
-        if(selections[i] != null) {
-          Log.d("sleman", "selections " + selections[i].length());
-
-        }
         streamIndexToTrackGroupIndex[i] = C.INDEX_UNSET;
       }
     }
@@ -453,12 +436,6 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
     for (int i = 0; i < selections.length; i++) {
       ExoTrackSelection selection = selections[i];
 
-      if(selection != null) {
-        Log.d("sleman", "selection " + selection.toString());
-      }
-
-      Log.d("sleman", "i " + i);
-
       if (selection == null) {
         continue;
       }
@@ -467,16 +444,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
         streamResetFlags[i] = true;
         int trackGroupIndex = streamIndexToTrackGroupIndex[i];
 
-        Log.d("sleman", " trackGroupIndex " + trackGroupIndex);
-        Log.d("sleman", " 1 " + streamIndexToTrackGroupIndex.length);
-
-        for(int w =0; w < streamIndexToTrackGroupIndex.length; w++) {
-          Log.d("sleman", " NF " + streamIndexToTrackGroupIndex[w]);
-        }
         TrackGroupInfo trackGroupInfo = trackGroupInfos[trackGroupIndex];
-        if(trackGroupInfo != null) {
-          Log.d("sleman", "trackGroupInfo " + trackGroupInfo.trackType);
-        }
         if (trackGroupInfo.trackGroupCategory == TrackGroupInfo.CATEGORY_PRIMARY) {
           streams[i] = buildSampleStream(trackGroupInfo, selection, positionUs);
         } else if (trackGroupInfo.trackGroupCategory == TrackGroupInfo.CATEGORY_MANIFEST_EVENTS) {
