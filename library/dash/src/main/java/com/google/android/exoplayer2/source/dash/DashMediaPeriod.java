@@ -54,6 +54,7 @@ import com.google.android.exoplayer2.upstream.Allocator;
 import com.google.android.exoplayer2.upstream.LoadErrorHandlingPolicy;
 import com.google.android.exoplayer2.upstream.LoaderErrorThrower;
 import com.google.android.exoplayer2.upstream.TransferListener;
+import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.Util;
 import com.google.common.primitives.Ints;
@@ -431,6 +432,9 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
     // Create newly selected primary and event streams.
     for (int i = 0; i < selections.length; i++) {
       ExoTrackSelection selection = selections[i];
+      Log.d("sleman", "selection " + selection.toString());
+      Log.d("sleman", "i " + i);
+
       if (selection == null) {
         continue;
       }
@@ -438,6 +442,12 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
         // Create new stream for selection.
         streamResetFlags[i] = true;
         int trackGroupIndex = streamIndexToTrackGroupIndex[i];
+        Log.d("sleman", " trackGroupIndex " + trackGroupIndex);
+        Log.d("sleman", " 1 " + streamIndexToTrackGroupIndex.length);
+
+        for(int w =0; w < streamIndexToTrackGroupIndex.length; w++) {
+          Log.d("sleman", " NF " + streamIndexToTrackGroupIndex[w]);
+        }
         TrackGroupInfo trackGroupInfo = trackGroupInfos[trackGroupIndex];
         if (trackGroupInfo.trackGroupCategory == TrackGroupInfo.CATEGORY_PRIMARY) {
           streams[i] = buildSampleStream(trackGroupInfo, selection, positionUs);
