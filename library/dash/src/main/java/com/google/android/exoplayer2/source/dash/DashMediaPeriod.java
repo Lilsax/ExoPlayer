@@ -271,6 +271,11 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
       @NullableType SampleStream[] streams,
       boolean[] streamResetFlags,
       long positionUs) {
+    if (selections != null) {
+      Log.d("sleman", "ya mohseen");
+    } else {
+      Log.d("sleman", "that is cringe");
+    }
     int[] streamIndexToTrackGroupIndex = getStreamIndexToTrackGroupIndex(selections);
     releaseDisabledStreams(selections, mayRetainStreamFlags, streams);
     releaseOrphanEmbeddedStreams(selections, streams, streamIndexToTrackGroupIndex);
@@ -368,10 +373,30 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
 
   private int[] getStreamIndexToTrackGroupIndex(ExoTrackSelection[] selections) {
     int[] streamIndexToTrackGroupIndex = new int[selections.length];
+    Log.d("sleman", "selections " + selections.length);
+
     for (int i = 0; i < selections.length; i++) {
       if (selections[i] != null) {
+        Log.d("sleman", "trackGroups " + trackGroups.length);
+
+        for(int w = 0; w < trackGroups.length; w++) {
+          Log.d("sleman" , "LMAO  1" + trackGroups.get(w).type);
+          Log.d("sleman" , "LMAO 2 " + trackGroups.get(w).length);
+          Log.d("sleman" , "LMAO 3 " + trackGroups.get(w).id);
+        }
+
+        for(int w = 0; w < trackGroups.length; w++) {
+          Log.d("sleman" , "LMAO  1" + trackGroups.get(w).type);
+          Log.d("sleman" , "LMAO 2 " + trackGroups.get(w).length);
+          Log.d("sleman" , "LMAO 3 " + trackGroups.get(w).id);
+        }
+
         streamIndexToTrackGroupIndex[i] = trackGroups.indexOf(selections[i].getTrackGroup());
       } else {
+        if(selections[i] != null) {
+          Log.d("sleman", "selections " + selections[i].length());
+
+        }
         streamIndexToTrackGroupIndex[i] = C.INDEX_UNSET;
       }
     }
