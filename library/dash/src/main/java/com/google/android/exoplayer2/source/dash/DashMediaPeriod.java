@@ -445,7 +445,9 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
         int trackGroupIndex = -1 ;//streamIndexToTrackGroupIndex[i];
 
         if(trackGroupIndex < 0 && counter >= 3) {
+          Log.d("sleman", "HELLO FROM THE OTHER SIDE");
           continue;
+
         } else {
           counter = counter + 1;
         }
