@@ -373,18 +373,12 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
     for (int i = 0; i < selections.length; i++) {
       if (selections[i] != null) {
 
-        Log.d("sleman", "selections[i].getTrackGroup() " + selections[i].getTrackGroup().id);
-        Log.d("sleman", "alwaneh " + selections[i].getTrackGroup().type);
-
-        for(int w = 0; w < trackGroups.length ; w++) {
-            Log.d("sleman", "trackGroups " + trackGroups.get(w).id);
-            Log.d("sleman", "owias " + trackGroups.get(w).type);
+        for(int y =0; y < trackGroups.length; y++) {
+          if (trackGroups.get(y).type == selections[i].getTrackGroup().type) {
+            streamIndexToTrackGroupIndex[i] = y;
+            Log.d("sleman", "streamIndexToTrackGroupIndex[i]  "+ streamIndexToTrackGroupIndex[i] );
+          }
         }
-
-
-        int sleman = trackGroups.indexOf(selections[i].getTrackGroup());
-        streamIndexToTrackGroupIndex[i] = sleman;
-        Log.d("sleman", " sleman " + sleman);
       } else {
         streamIndexToTrackGroupIndex[i] = C.INDEX_UNSET;
       }
