@@ -102,6 +102,11 @@ public class DashManifestParser extends DefaultHandler
       XmlPullParser xpp = xmlParserFactory.newPullParser();
       xpp.setInput(inputStream, null);
       int eventType = xpp.next();
+      Log.d("sleman", "xpp " + xpp.getName());
+      Log.d("sleman", "eventType " + eventType);
+      Log.d("sleman", "xpp.getInputEncoding() " + xpp.getInputEncoding());
+      Log.d("sleman", " xpp.getPrefix() " + xpp.getPrefix());
+
       if (eventType != XmlPullParser.START_TAG || !"MPD".equals(xpp.getName())) {
         throw ParserException.createForMalformedManifest(
             "inputStream does not contain a valid media presentation description",
