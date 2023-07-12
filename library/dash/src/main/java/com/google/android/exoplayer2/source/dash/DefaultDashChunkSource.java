@@ -51,6 +51,7 @@ import com.google.android.exoplayer2.upstream.HttpDataSource.InvalidResponseCode
 import com.google.android.exoplayer2.upstream.LoadErrorHandlingPolicy;
 import com.google.android.exoplayer2.upstream.LoaderErrorThrower;
 import com.google.android.exoplayer2.upstream.TransferListener;
+import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.Util;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -209,6 +210,9 @@ public class DefaultDashChunkSource implements DashChunkSource {
     List<Representation> representations = getRepresentations();
     representationHolders = new RepresentationHolder[trackSelection.length()];
     for (int i = 0; i < representationHolders.length; i++) {
+      Log.e("sleman", "representations representations "+ representations.size());
+      Log.e("sleman", "getIndexInTrackGroup(i) 123 "+ trackSelection.getIndexInTrackGroup(i));
+
       Representation representation = representations.get(trackSelection.getIndexInTrackGroup(i));
       @Nullable
       BaseUrl selectedBaseUrl = baseUrlExclusionList.selectBaseUrl(representation.baseUrls);
@@ -262,7 +266,12 @@ public class DefaultDashChunkSource implements DashChunkSource {
       long periodDurationUs = manifest.getPeriodDurationUs(periodIndex);
       List<Representation> representations = getRepresentations();
       for (int i = 0; i < representationHolders.length; i++) {
+        Log.d("sleman", " trackSelection.getIndexInTrackGroup(i) " + trackSelection.getIndexInTrackGroup(i));
+        Log.e("sleman", "representations size " + representations.size());
+        Log.d("sleman", " trackSelection.getIndexInTrackGroup(i) " + trackSelection.getTrackGroup().length);
+
         Representation representation = representations.get(trackSelection.getIndexInTrackGroup(i));
+
         representationHolders[i] =
             representationHolders[i].copyWithNewRepresentation(periodDurationUs, representation);
       }
@@ -589,6 +598,9 @@ public class DefaultDashChunkSource implements DashChunkSource {
     List<AdaptationSet> manifestAdaptationSets = manifest.getPeriod(periodIndex).adaptationSets;
     ArrayList<Representation> representations = new ArrayList<>();
     for (int adaptationSetIndex : adaptationSetIndices) {
+      Log.e("sleman", "manifestAdaptationSets size" + manifestAdaptationSets.size());
+      Log.e("sleman", "adaptationSetIndex size" + adaptationSetIndex);
+
       representations.addAll(manifestAdaptationSets.get(adaptationSetIndex).representations);
     }
     return representations;
