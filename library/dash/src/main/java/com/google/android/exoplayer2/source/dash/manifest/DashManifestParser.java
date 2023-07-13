@@ -104,7 +104,7 @@ public class DashManifestParser extends DefaultHandler
       int eventType = xpp.next();
       if (eventType != XmlPullParser.START_TAG || !"MPD".equals(xpp.getName())) {
         throw ParserException.createForMalformedManifest(
-            "inputStream does not contain a valid media presentation description",
+            "inputStream does not contain a valid media presentation description" + " ,Tag :- " + xpp.getName() + " ,eventType :- " + eventType + " ,url :- " + uri,
             /* cause= */ null);
       }
       return parseMediaPresentationDescription(xpp, uri);
