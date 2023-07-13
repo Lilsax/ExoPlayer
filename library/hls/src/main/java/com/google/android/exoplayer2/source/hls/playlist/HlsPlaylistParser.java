@@ -63,6 +63,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.checkerframework.checker.nullness.qual.EnsuresNonNullIf;
 import org.checkerframework.checker.nullness.qual.PolyNull;
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserException;
+import org.xmlpull.v1.XmlPullParserFactory;
 
 /** HLS playlists parsing logic. */
 public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlaylist> {
@@ -256,6 +259,23 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
     Queue<String> extraLines = new ArrayDeque<>();
     String line;
     try {
+
+      XmlPullParserFactory xmlParserFactory = XmlPullParserFactory.newInstance();
+      XmlPullParser xpp = xmlParserFactory.newPullParser();
+      xpp.setInput(inputStream, null);
+      int eventType = xpp.next();
+
+      Log.d("sleman", "xpp " + xpp.getName());
+      Log.d("sleman", "eventType " + eventType);
+      Log.d("sleman", "xpp.getInputEncoding() " + xpp.getInputEncoding());
+      Log.d("sleman", " xpp.getPrefix() " + xpp.getPrefix());
+      Log.d("sleman", " inputStream " + inputStream.toString());
+
+
+      Log.d("sleman", "reader " + reader.readLine());
+      Log.d("sleman", "reader " + reader.toString());
+      Log.d("sleman", "uri " + uri);
+
       if (!checkPlaylistHeader(reader)) {
         throw ParserException.createForMalformedManifest(
             /* message= */ "Input does not start with the #EXTM3U header.", /* cause= */ null);
@@ -285,6 +305,8 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
           extraLines.add(line);
         }
       }
+    } catch (XmlPullParserException e) {
+      throw new RuntimeException(e);
     } finally {
       Util.closeQuietly(reader);
     }
