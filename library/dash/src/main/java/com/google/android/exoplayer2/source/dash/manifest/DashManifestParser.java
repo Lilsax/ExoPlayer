@@ -95,7 +95,10 @@ public class DashManifestParser extends DefaultHandler
   }
 
   // MPD parsing.
-
+  static String convertStreamToString(java.io.InputStream is) {
+    java.util.Scanner s = new java.util.Scanner(is).useDelimiter("\\A");
+    return s.hasNext() ? s.next() : "";
+  }
   @Override
   public DashManifest parse(Uri uri, InputStream inputStream) throws IOException {
     try {
@@ -107,9 +110,12 @@ public class DashManifestParser extends DefaultHandler
       Log.d("sleman", "xpp.getInputEncoding() " + xpp.getInputEncoding());
       Log.d("sleman", " xpp.getPrefix() " + xpp.getPrefix());
 
+      Log.d("sleman", " stream() " + convertStreamToString(inputStream));
+
       if (eventType != XmlPullParser.START_TAG || !"MPD".equals(xpp.getName())) {
+        Log.d("sleman", "inputStream does not contain a valid media presentation description" + " ,Tag :- " + xpp.getName() + " ,eventType :- " + eventType + " ,url :- " + uri);
         throw ParserException.createForMalformedManifest(
-            "inputStream does not contain a valid media presentation description",
+            "inputStream does not contain a valid media presentation description" + " ,Tag :- " + xpp.getName() + " ,eventType :- " + eventType + " ,url :- " + uri,
             /* cause= */ null);
       }
       return parseMediaPresentationDescription(xpp, uri);
