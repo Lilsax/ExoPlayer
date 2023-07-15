@@ -63,6 +63,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.checkerframework.checker.nullness.qual.EnsuresNonNullIf;
 import org.checkerframework.checker.nullness.qual.PolyNull;
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserException;
+import org.xmlpull.v1.XmlPullParserFactory;
 
 /** HLS playlists parsing logic. */
 public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlaylist> {
@@ -290,6 +293,8 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
           extraLines.add(line);
         }
       }
+    } catch (XmlPullParserException e) {
+      throw new RuntimeException(e);
     } finally {
       Util.closeQuietly(reader);
     }
