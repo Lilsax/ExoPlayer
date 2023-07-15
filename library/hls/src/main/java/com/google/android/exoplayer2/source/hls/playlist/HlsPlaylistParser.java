@@ -258,6 +258,10 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
     BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
     Queue<String> extraLines = new ArrayDeque<>();
     String line;
+    Log.d("sleman", "inputStream " + inputStream.toString());
+    Log.d("sleman", "1 " + reader.readLine());
+    Log.d("sleman", "1 " + reader.toString());
+
     try {
       if (!checkPlaylistHeader(reader)) {
         XmlPullParserFactory xmlParserFactory = XmlPullParserFactory.newInstance();

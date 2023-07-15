@@ -22,6 +22,7 @@ import com.google.android.exoplayer2.ParserException;
 import com.google.android.exoplayer2.source.LoadEventInfo;
 import com.google.android.exoplayer2.upstream.Loader.Loadable;
 import com.google.android.exoplayer2.util.Assertions;
+import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.Util;
 import java.io.IOException;
 import java.io.InputStream;
@@ -170,6 +171,9 @@ public final class ParsingLoadable<T> implements Loadable {
     // We always load from the beginning, so reset bytesRead to 0.
     dataSource.resetBytesRead();
     DataSourceInputStream inputStream = new DataSourceInputStream(dataSource, dataSpec);
+    Log.d("sleman", "inputStream " + inputStream.toString());
+    Log.d("sleman", "inputStream " + inputStream.toString());
+
     try {
       inputStream.open();
       Uri dataSourceUri = Assertions.checkNotNull(dataSource.getUri());
