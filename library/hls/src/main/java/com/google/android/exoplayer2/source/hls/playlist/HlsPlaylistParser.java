@@ -260,13 +260,8 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
     String line;
     try {
       if (!checkPlaylistHeader(reader)) {
-        XmlPullParserFactory xmlParserFactory = XmlPullParserFactory.newInstance();
-        XmlPullParser xpp = xmlParserFactory.newPullParser();
-        xpp.setInput(inputStream, null);
-        int eventType = xpp.next();
-
         throw ParserException.createForMalformedManifest(
-            /* message= */ "Input does not start with the #EXTM3U header."  + " ,Tag :- " + xpp.getName() + " ,eventType :- " + eventType + " ,url :- " + uri, /* cause= */ null);
+            /* message= */ "Input does not start with the #EXTM3U header."  + " ,Tag :- " + reader.readLine() + " ,url :- " + uri, /* cause= */ null);
       }
       while ((line = reader.readLine()) != null) {
         line = line.trim();
@@ -293,8 +288,6 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
           extraLines.add(line);
         }
       }
-    } catch (XmlPullParserException e) {
-      throw new RuntimeException(e);
     } finally {
       Util.closeQuietly(reader);
     }
