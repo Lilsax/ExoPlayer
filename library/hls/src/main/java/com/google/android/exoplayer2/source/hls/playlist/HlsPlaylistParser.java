@@ -258,8 +258,17 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
     BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
     Queue<String> extraLines = new ArrayDeque<>();
     String line;
+
+    Log.d("SUUU", "ready: " + reader.ready());
+    Log.d("SUUU", "parse: " + reader.readLine());
+    Log.d("SUUU", "parse 2: " + reader.readLine());
+
+    reader.reset();
+
     try {
       if (!checkPlaylistHeader(reader)) {
+        Log.d("SUUU", "parse 5: NOT" );
+        reader.reset();
         throw ParserException.createForMalformedManifest(
             /* message= */ "Input does not start with the #EXTM3U header."  + " ,Tag :- " + reader.readLine() + " ,url :- " + uri, /* cause= */ null);
       }
@@ -298,21 +307,30 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
   private static boolean checkPlaylistHeader(BufferedReader reader) throws IOException {
     int last = reader.read();
     if (last == 0xEF) {
+      Log.d("SUUU", "checkPlaylistHeader: has BOM");
       if (reader.read() != 0xBB || reader.read() != 0xBF) {
         return false;
       }
+      Log.d("SUUU", "checkPlaylistHeader: has BOM EXTRA");
+
       // The playlist contains a Byte Order Mark, which gets discarded.
       last = reader.read();
+      Log.d("SUUU", "checkPlaylistHeader: last 1: " + last);
+
     }
     last = skipIgnorableWhitespace(reader, true, last);
     int playlistHeaderLength = PLAYLIST_HEADER.length();
     for (int i = 0; i < playlistHeaderLength; i++) {
+      Log.d("SUUU", "checkPlaylistHeader playlistHeaderLength: char at: " + i + " :" + last + " , pl:" + PLAYLIST_HEADER.charAt(i));
+
       if (last != PLAYLIST_HEADER.charAt(i)) {
         return false;
       }
       last = reader.read();
     }
     last = skipIgnorableWhitespace(reader, false, last);
+    Log.d("SUUU", "checkPlaylistHeader: last 3: " + last + " Util.isLinebreak(last):" + Util.isLinebreak(last));
+
     return Util.isLinebreak(last);
   }
 
