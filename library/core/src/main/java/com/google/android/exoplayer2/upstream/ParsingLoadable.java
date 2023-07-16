@@ -182,7 +182,17 @@ public final class ParsingLoadable<T> implements Loadable {
 
     DataSourceInputStream inputStream = new DataSourceInputStream(dataSource, dataSpec);
     BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+    BufferedReader wow = new BufferedReader(new InputStreamReader(inputStream));
 
+    String slemanZ = wow.readLine();
+    String slemanW = wow.readLine();
+    Log.d("sleman " , "slemanZZ " + slemanW);
+
+    Log.d("sleman " , "slemanW " + slemanW);
+    while(slemanZ != null || slemanW != null) {
+      Log.d("sleman", "slemanZ " + slemanZ);
+      slemanZ = wow.readLine();
+    }
     Log.d("sleman", "reader.readLine() " + reader.readLine());
     if(reader.readLine() == null) {
       Log.d("sleman", "null");
