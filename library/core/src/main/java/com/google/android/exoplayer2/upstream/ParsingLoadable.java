@@ -183,10 +183,13 @@ public final class ParsingLoadable<T> implements Loadable {
     DataSourceInputStream inputStream = new DataSourceInputStream(dataSource, dataSpec);
     BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
 
+    Log.d("sleman", "reader.readLine() " + reader.readLine());
     if(reader.readLine() == null) {
       Log.d("sleman", "null");
       inputStream = new DataSourceInputStream(dataSource, dataSpec);
     }
+
+    reader.reset();
 
     try {
       inputStream.open();
