@@ -577,6 +577,7 @@ public final class Util {
    *     run. {@code false} otherwise.
    */
   public static boolean postOrRun(Handler handler, Runnable runnable) {
+    Log.d("sleman", " dani -1");
     Looper looper = handler.getLooper();
     if (!looper.getThread().isAlive()) {
       return false;
@@ -603,6 +604,8 @@ public final class Util {
    */
   public static <T> ListenableFuture<T> postOrRunWithCompletion(
       Handler handler, Runnable runnable, T successValue) {
+    Log.d("sleman", " dani -2");
+
     SettableFuture<T> outputFuture = SettableFuture.create();
     postOrRun(
         handler,

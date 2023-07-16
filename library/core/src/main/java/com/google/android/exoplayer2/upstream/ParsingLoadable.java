@@ -179,18 +179,7 @@ public final class ParsingLoadable<T> implements Loadable {
     // We always load from the beginning, so reset bytesRead to 0.
     Log.d("sleman", "J-cole");
     dataSource.resetBytesRead();
-
     DataSourceInputStream inputStream = new DataSourceInputStream(dataSource, dataSpec);
-    BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
-    Log.d("sleman", "reader.readLine() " + reader.readLine());
-    reader.reset();
-    if(reader.readLine() == null) {
-      Log.d("sleman", "null");
-      inputStream = new DataSourceInputStream(dataSource, dataSpec);
-    }
-
-    reader.reset();
-
     try {
       inputStream.open();
       Uri dataSourceUri = Assertions.checkNotNull(dataSource.getUri());
