@@ -409,6 +409,7 @@ public final class Loader implements LoaderErrorThrower {
         if (shouldLoad) {
           TraceUtil.beginSection("load:" + loadable.getClass().getSimpleName());
           try {
+            Log.d("sleman", "dani 1");
             loadable.load();
           } finally {
             TraceUtil.endSection();

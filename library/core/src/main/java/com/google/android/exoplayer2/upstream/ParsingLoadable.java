@@ -22,11 +22,16 @@ import com.google.android.exoplayer2.ParserException;
 import com.google.android.exoplayer2.source.LoadEventInfo;
 import com.google.android.exoplayer2.upstream.Loader.Loadable;
 import com.google.android.exoplayer2.util.Assertions;
+import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.Util;
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 
 /**
  * A {@link Loadable} for objects that can be parsed from binary data using a {@link Parser}.
@@ -63,6 +68,9 @@ public final class ParsingLoadable<T> implements Loadable {
   public static <T> T load(DataSource dataSource, Parser<? extends T> parser, Uri uri, int type)
       throws IOException {
     ParsingLoadable<T> loadable = new ParsingLoadable<>(dataSource, uri, type, parser);
+
+    Log.d("sleman", "dani 2");
+
     loadable.load();
     return Assertions.checkNotNull(loadable.getResult());
   }
@@ -81,6 +89,7 @@ public final class ParsingLoadable<T> implements Loadable {
       DataSource dataSource, Parser<? extends T> parser, DataSpec dataSpec, int type)
       throws IOException {
     ParsingLoadable<T> loadable = new ParsingLoadable<>(dataSource, dataSpec, type, parser);
+    Log.d("sleman", "dani 3");
     loadable.load();
     return Assertions.checkNotNull(loadable.getResult());
   }
@@ -168,12 +177,25 @@ public final class ParsingLoadable<T> implements Loadable {
   @Override
   public final void load() throws IOException {
     // We always load from the beginning, so reset bytesRead to 0.
+    Log.d("sleman", "J-cole");
     dataSource.resetBytesRead();
+
     DataSourceInputStream inputStream = new DataSourceInputStream(dataSource, dataSpec);
+    BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+
+    if(reader.readLine() == null) {
+      Log.d("sleman", "null");
+      inputStream = new DataSourceInputStream(dataSource, dataSpec);
+    }
+
     try {
       inputStream.open();
       Uri dataSourceUri = Assertions.checkNotNull(dataSource.getUri());
+      Log.d("sleman", "dataSource.getUri() " + dataSource.getUri().toString());
+      Log.d("sleman", "dataSourceUri " + dataSourceUri.toString());
+
       result = parser.parse(dataSourceUri, inputStream);
+      Log.d("sleman", "result " + result.toString());
     } finally {
       Util.closeQuietly(inputStream);
     }
