@@ -438,6 +438,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
         // Create new stream for selection.
         streamResetFlags[i] = true;
         int trackGroupIndex = streamIndexToTrackGroupIndex[i];
+        if(trackGroupIndex == -1 || trackGroupIndex > trackGroupInfos.length) { continue; }
         TrackGroupInfo trackGroupInfo = trackGroupInfos[trackGroupIndex];
         if (trackGroupInfo.trackGroupCategory == TrackGroupInfo.CATEGORY_PRIMARY) {
           streams[i] = buildSampleStream(trackGroupInfo, selection, positionUs);
