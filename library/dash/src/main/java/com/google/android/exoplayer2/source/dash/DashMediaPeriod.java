@@ -438,7 +438,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
         // Create new stream for selection.
         streamResetFlags[i] = true;
         int trackGroupIndex = streamIndexToTrackGroupIndex[i];
-        if(trackGroupIndex == -1 || trackGroupIndex > trackGroupInfos.length) { continue; }
+        if(trackGroupIndex == -1 || trackGroupIndex >= trackGroupInfos.length) { continue; }
         TrackGroupInfo trackGroupInfo = trackGroupInfos[trackGroupIndex];
         if (trackGroupInfo.trackGroupCategory == TrackGroupInfo.CATEGORY_PRIMARY) {
           streams[i] = buildSampleStream(trackGroupInfo, selection, positionUs);
@@ -460,6 +460,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
     for (int i = 0; i < selections.length; i++) {
       if (streams[i] == null && selections[i] != null) {
         int trackGroupIndex = streamIndexToTrackGroupIndex[i];
+        if(trackGroupIndex == -1 || trackGroupIndex >= trackGroupInfos.length) { continue; }
         TrackGroupInfo trackGroupInfo = trackGroupInfos[trackGroupIndex];
         if (trackGroupInfo.trackGroupCategory == TrackGroupInfo.CATEGORY_EMBEDDED) {
           int primaryStreamIndex = getPrimaryStreamIndex(i, streamIndexToTrackGroupIndex);
