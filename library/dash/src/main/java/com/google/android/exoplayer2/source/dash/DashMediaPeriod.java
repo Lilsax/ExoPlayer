@@ -367,14 +367,23 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
 
   private int[] getStreamIndexToTrackGroupIndex(ExoTrackSelection[] selections) {
     int[] streamIndexToTrackGroupIndex = new int[selections.length];
+    int[] fakseStreamIndexToTrackGroupIndex = new int[selections.length];
+
     for (int i = 0; i < selections.length; i++) {
       if (selections[i] != null) {
         TrackGroup testTrackGroup = selections[i].getTrackGroup();
-        streamIndexToTrackGroupIndex[i] = trackGroups.indexOf(testTrackGroup);
+        for(int y = 0; y < trackGroups.length; y++) {
+          if(trackGroups.get(y).getFormat(0).id == testTrackGroup.getFormat(0).id) {
+            streamIndexToTrackGroupIndex[i] = y;
+          }
+        }
+        fakseStreamIndexToTrackGroupIndex[i] = trackGroups.indexOf(testTrackGroup);
       } else {
         streamIndexToTrackGroupIndex[i] = C.INDEX_UNSET;
       }
     }
+
+
     return streamIndexToTrackGroupIndex;
   }
 
