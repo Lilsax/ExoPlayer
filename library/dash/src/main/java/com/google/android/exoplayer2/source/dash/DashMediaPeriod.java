@@ -369,7 +369,19 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
     int[] streamIndexToTrackGroupIndex = new int[selections.length];
     for (int i = 0; i < selections.length; i++) {
       if (selections[i] != null) {
-        streamIndexToTrackGroupIndex[i] = trackGroups.indexOf(selections[i].getTrackGroup());
+        int trackIndex = trackGroups.indexOf(selections[i].getTrackGroup());
+
+        // fallback in case we could not find map trackGroups through reference
+        if(trackIndex == -1) {
+          for(int y = 0; y < trackGroups.length; y++) {
+            if(trackGroups.get(y).getFormat(0).id == selections[i].getTrackGroup().getFormat(0).id) {
+              trackIndex = y;
+              break;
+            }
+          }
+        }
+
+        streamIndexToTrackGroupIndex[i] = trackIndex;
       } else {
         streamIndexToTrackGroupIndex[i] = C.INDEX_UNSET;
       }
