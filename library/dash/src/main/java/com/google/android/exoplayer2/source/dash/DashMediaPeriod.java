@@ -377,7 +377,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
             String trackFormatId = trackGroups.get(y).getFormat(0).id;
             String selectionFormatId = selections[i].getTrackGroup().getFormat(0).id;
 
-            if(trackFormatId == selectionFormatId) {
+            if(trackFormatId.equals(selectionFormatId)) {
               trackIndex = y;
               break;
             }
@@ -453,7 +453,6 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
         // Create new stream for selection.
         streamResetFlags[i] = true;
         int trackGroupIndex = streamIndexToTrackGroupIndex[i];
-        if(trackGroupIndex == -1 || trackGroupIndex >= trackGroupInfos.length) { continue; }
         TrackGroupInfo trackGroupInfo = trackGroupInfos[trackGroupIndex];
         if (trackGroupInfo.trackGroupCategory == TrackGroupInfo.CATEGORY_PRIMARY) {
           streams[i] = buildSampleStream(trackGroupInfo, selection, positionUs);
@@ -475,7 +474,6 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
     for (int i = 0; i < selections.length; i++) {
       if (streams[i] == null && selections[i] != null) {
         int trackGroupIndex = streamIndexToTrackGroupIndex[i];
-        if(trackGroupIndex == -1 || trackGroupIndex >= trackGroupInfos.length) { continue; }
         TrackGroupInfo trackGroupInfo = trackGroupInfos[trackGroupIndex];
         if (trackGroupInfo.trackGroupCategory == TrackGroupInfo.CATEGORY_EMBEDDED) {
           int primaryStreamIndex = getPrimaryStreamIndex(i, streamIndexToTrackGroupIndex);
