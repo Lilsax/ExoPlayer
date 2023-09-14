@@ -374,7 +374,10 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
         // fallback in case we could not find map trackGroups through reference
         if(trackIndex == -1) {
           for(int y = 0; y < trackGroups.length; y++) {
-            if(trackGroups.get(y).getFormat(0).id == selections[i].getTrackGroup().getFormat(0).id) {
+            String trackFormatId = trackGroups.get(y).getFormat(0).id;
+            String selectionFormatId = selections[i].getTrackGroup().getFormat(0).id;
+
+            if(trackFormatId == selectionFormatId) {
               trackIndex = y;
               break;
             }
